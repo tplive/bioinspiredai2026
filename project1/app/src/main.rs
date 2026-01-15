@@ -27,6 +27,21 @@ impl Individual {
             weight: 0,
         }
     }
+
+    fn fitness(&mut self, items: &[Item]) {
+        let mut p:usize = 0;
+        let mut w:usize = 0;
+
+        for (i, &in_sack) in self.items.iter().enumerate() {
+            if in_sack {
+                p += items[i].p;
+                w += items[i].w;
+
+            }
+        }
+        self.profit = p;
+        self.weight = w;
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -50,15 +65,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", items[0]);
 
-    let individual = Individual::new(10);
-    print!("{:?}", individual);
+    let mut individual = Individual::new(10);
+    individual.fitness(&items);
+    print!("Profit: {:?}, Weight: {:?}", individual.profit, individual.weight);
     
+
     let population: Vec<Individual> = (0..POPULATION_SIZE)
         .map(|_| {
             Individual::new(items.len())
         }).collect();
     
-    print!("{:?}", population);
+    //print!("{:?}", population);
 
     Ok(())
 }
