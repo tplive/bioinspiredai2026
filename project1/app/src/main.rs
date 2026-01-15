@@ -1,48 +1,7 @@
 use std::{error::Error, fs::File};
-use lib_sga::sga;
+use lib_sga::{Item, sga};
 use csv::StringRecord;
-use rand::{Rng, rng};
 
-#[derive(Debug)]
-struct Item {
-    i: usize,
-    p: usize,
-    w: usize,
-}
-
-#[derive(Debug)]
-struct Individual {
-    items: Vec<bool>, // For each index in the data, "is included in the knapsack" or not
-    profit: usize, // Calculated profit (sum of items p-values)
-    weight: usize, // Calculated weight (sum of items w-values)
-}
-impl Individual {
-    fn new(n_items: usize) -> Self {
-        let mut r = rng();
-        let items = (0..n_items).map(|_| r.random::<bool>()).collect();
-        
-        Self {
-            items,
-            profit: 0,
-            weight: 0,
-        }
-    }
-
-    fn fitness(&mut self, items: &[Item]) {
-        let mut p:usize = 0;
-        let mut w:usize = 0;
-
-        for (i, &in_sack) in self.items.iter().enumerate() {
-            if in_sack {
-                p += items[i].p;
-                w += items[i].w;
-
-            }
-        }
-        self.profit = p;
-        self.weight = w;
-    }
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     
@@ -65,21 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(format!("No items read from file {file}").into());
     }
 
-    println!("{:?}", items[0]);
-
-    let mut individual = Individual::new(10);
-    individual.fitness(&items);
-    print!("Profit: {:?}, Weight: {:?}", individual.profit, individual.weight);
-    
-
-    let population: Vec<Individual> = (0..POPULATION_SIZE)
-        .map(|_| {
-            Individual::new(items.len())
-        }).collect();
-    
-    //print!("{:?}", population);
-
-    let result = sga();
+    let result = sga(items, POPULATION_SIZE, CAPACITY);
 
     print!("Result of algorithm: {:?}", result);
 
