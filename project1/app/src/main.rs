@@ -39,6 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // - the total weight of items don't exceed 280785
     const CAPACITY: usize = 280785;
 
+    const POPULATION_SIZE: usize = 100;
 
     let file = "knapsack/knapPI_12_500_1000_82.csv".to_string();
 
@@ -52,6 +53,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let individual = Individual::new(10);
     print!("{:?}", individual);
     
+    let population: Vec<Individual> = (0..POPULATION_SIZE)
+        .map(|_| {
+            Individual::new(items.len())
+        }).collect();
+    
+    print!("{:?}", population);
+
     Ok(())
 }
 
