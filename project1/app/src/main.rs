@@ -1,12 +1,32 @@
 use std::{error::Error, fs::File};
 
 use csv::StringRecord;
+use rand::{Rng, rng};
 
 #[derive(Debug)]
 struct Item {
     i: usize,
     p: usize,
     w: usize,
+}
+
+#[derive(Debug)]
+struct Individual {
+    items: Vec<bool>, // For each index in the data, "is included in the knapsack" or not
+    profit: usize, // Calculated profit (sum of items p-values)
+    weight: usize, // Calculated weight (sum of items w-values)
+}
+impl Individual {
+    fn new(n_items: usize) -> Self {
+        let mut r = rng();
+        let items = (0..n_items).map(|_| r.random::<bool>()).collect();
+        
+        Self {
+            items,
+            profit: 0,
+            weight: 0,
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -17,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // We need to find the combination of items where 
     // - the profit is highest, given that 
     // - the total weight of items don't exceed 280785
+    const CAPACITY: usize = 280785;
 
 
     let file = "knapsack/knapPI_12_500_1000_82.csv".to_string();
@@ -28,6 +49,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", items[0]);
 
+    let individual = Individual::new(10);
+    print!("{:?}", individual);
+    
     Ok(())
 }
 
