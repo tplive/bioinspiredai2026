@@ -24,9 +24,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(format!("No items read from file {file}").into());
     }
 
-    let result = sga(items, POPULATION_SIZE, CAPACITY);
+    let best_individual = sga(&items, POPULATION_SIZE, CAPACITY);
 
-    print!("Result of algorithm: {:?}", result);
+    println!("Result of algorithm: {:?}", best_individual.profit);
 
     Ok(())
 }
