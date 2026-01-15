@@ -1,5 +1,5 @@
 use std::{error::Error, fs::File};
-
+use lib_sga::sga;
 use csv::StringRecord;
 use rand::{Rng, rng};
 
@@ -48,15 +48,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     // Read data from project1/knapsack/knapPI_12_500_1000_82.csv
     // The data format is I(ndex), p(rofit), w(eight)
-    // The knapsack capacity is given at 280785 units
+    // The knapsack capacity is given at 280785 units.
+    // Optimal solution is 296735.
     // We need to find the combination of items where 
     // - the profit is highest, given that 
     // - the total weight of items don't exceed 280785
     const CAPACITY: usize = 280785;
+    const OPTIMAL: usize = 296735;
 
     const POPULATION_SIZE: usize = 100;
 
-    let file = "knapsack/knapPI_12_500_1000_82.csv".to_string();
+    let file = String::from("knapsack/knapPI_12_500_1000_82.csv");
 
     let items: Vec<Item> = read_from_file(&file)?;
     if items.is_empty() {
@@ -76,6 +78,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }).collect();
     
     //print!("{:?}", population);
+
+    let result = sga();
+
+    print!("Result of algorithm: {:?}", result);
 
     Ok(())
 }
