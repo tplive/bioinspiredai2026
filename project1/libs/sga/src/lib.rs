@@ -1,3 +1,5 @@
+use std::slice::IterMut;
+
 use rand::{Rng, rng};
 
 #[derive(Debug)]
@@ -17,7 +19,7 @@ impl Individual {
     fn new(n_items: usize) -> Self {
         let mut r = rng();
         let genes = (0..n_items).map(|_| r.random::<bool>()).collect();
-        
+
         Self {
             genome: genes,
             profit: 0,
@@ -26,14 +28,13 @@ impl Individual {
     }
 
     fn fitness(&mut self, items: &[Item]) {
-        let mut p:usize = 0;
-        let mut w:usize = 0;
+        let mut p: usize = 0;
+        let mut w: usize = 0;
 
         for (i, &in_sack) in self.genome.iter().enumerate() {
             if in_sack {
                 p += items[i].p;
                 w += items[i].w;
-
             }
         }
         self.profit = p;
@@ -41,21 +42,43 @@ impl Individual {
     }
 }
 
+pub struct Population {
+    individuals: Vec<Individual>,
+}
 
- pub fn sga(items: &[Item], pop_size: usize, capacity: usize, optimal: usize, generations: usize) -> Individual {
+impl Population {
+    
+    fn new(population_size: usize, items: &[Item]) -> Self {
+        let individuals = (0..population_size)
+            .map(|_| Individual::new(items.len()))
+            .collect();
+
+        Self {
+            individuals
+        }
+    }
+
+    fn iter_mut(&mut self) -> IterMut<'_, Individual> {
+        self.individuals.iter_mut()
+    }
+}
+
+pub fn sga(
+    items: &[Item],
+    pop_size: usize,
+    capacity: usize,
+    optimal: usize,
+    generations: usize,
+) -> Individual {
 
     // Initialize population
-    let mut population: Vec<Individual> = (0..pop_size)
-        .map(|_| {
-            Individual::new(items.len())
-        }).collect();
-    
+    let mut population = Population::new(pop_size, items);
     
     // Calculate fitness for the whole population, return the best fit individual
     let mut best_fit_index = 0;
     let mut best_profit = 0;
 
-    for _gen in 1..generations+1 {
+    for _gen in 1..generations + 1 {
         println!("Generation {:?}", _gen);
 
         for (index, i) in population.iter_mut().enumerate() {
@@ -63,12 +86,15 @@ impl Individual {
             if i.profit > best_profit && i.profit <= capacity {
                 best_fit_index = index;
                 best_profit = i.profit;
-                println!("New best individual weighs {:?} with {:?} profit", i.weight, i.profit);
+                println!(
+                    "New best individual weighs {:?} with {:?} profit",
+                    i.weight, i.profit
+                );
             }
         }
     }
-    
-    population[best_fit_index].clone()
+
+    population.individuals[best_fit_index].clone()
 }
 
 #[cfg(test)]
@@ -77,15 +103,14 @@ mod tests {
 
     #[test]
     pub fn test_individual_fitness() {
-
         let items = [
-            Item {i: 0, p: 5, w: 2},
-            Item {i: 1, p: 6, w: 3},
-            Item {i: 2, p: 7, w: 4},
+            Item { i: 0, p: 5, w: 2 },
+            Item { i: 1, p: 6, w: 3 },
+            Item { i: 2, p: 7, w: 4 },
         ];
 
         let mut individual1 = Individual {
-            genome: vec![true, true, true,],
+            genome: vec![true, true, true],
             profit: 0,
             weight: 0,
         };
@@ -96,7 +121,7 @@ mod tests {
         assert_eq!(individual1.weight, 9);
 
         let mut individual2 = Individual {
-            genome: vec![false, false, false,],
+            genome: vec![false, false, false],
             profit: 0,
             weight: 0,
         };
@@ -105,5 +130,5 @@ mod tests {
 
         assert_eq!(individual2.profit, 0);
         assert_eq!(individual2.weight, 0);
-    }    
+    }
 }
