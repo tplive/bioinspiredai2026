@@ -42,7 +42,7 @@ impl Individual {
 }
 
 
-pub fn sga(items: &[Item], pop_size: usize, capacity: usize) -> Individual {
+ pub fn sga(items: &[Item], pop_size: usize, capacity: usize, optimal: usize, generations: usize) -> Individual {
 
     // Initialize population
     let mut population: Vec<Individual> = (0..pop_size)
@@ -50,15 +50,21 @@ pub fn sga(items: &[Item], pop_size: usize, capacity: usize) -> Individual {
             Individual::new(items.len())
         }).collect();
     
+    
     // Calculate fitness for the whole population, return the best fit individual
     let mut best_fit_index = 0;
     let mut best_profit = 0;
 
-    for (index, i) in population.iter_mut().enumerate() {
-        i.fitness(items);
-        if i.profit > best_profit && i.profit <= capacity {
-            best_fit_index = index;
-            best_profit = i.profit;
+    for _gen in 1..generations+1 {
+        println!("Generation {:?}", _gen);
+
+        for (index, i) in population.iter_mut().enumerate() {
+            i.fitness(items);
+            if i.profit > best_profit && i.profit <= capacity {
+                best_fit_index = index;
+                best_profit = i.profit;
+                println!("New best individual weighs {:?} with {:?} profit", i.weight, i.profit);
+            }
         }
     }
     
