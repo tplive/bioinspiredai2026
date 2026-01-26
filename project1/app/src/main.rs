@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Hyperparameters
     const POPULATION_SIZE: usize = 100;
-    const GENERATIONS: usize = 100;
+    const GENERATIONS: usize = 1;
 
     let file = String::from("knapsack/knapPI_12_500_1000_82.csv");
 
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let best_individual = sga(&items, POPULATION_SIZE, CAPACITY, OPTIMAL, GENERATIONS);
 
-    println!("Result of algorithm: {:?}", best_individual.profit);
+    println!("Result of algorithm: {:?}", best_individual.fitness_score);
 
     Ok(())
 }
