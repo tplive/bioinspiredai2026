@@ -30,7 +30,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let (best_individual, gen_stats) = sga(&items, POPULATION_SIZE, CAPACITY, OPTIMAL, GENERATIONS);
 
-    println!("Result of algorithm: {:?}", gen_stats.iter().map(|f| f.max).max());
+    let weight_delta = CAPACITY - best_individual.weight;
+    let optimal_delta = OPTIMAL - best_individual.fitness_score;
+    println!("Results are in! Weight: {:?}, Fitness score: {:?}", best_individual.weight, best_individual.fitness_score);
+    println!("Only {} from capacity and {} below optimal!", weight_delta, optimal_delta);
+    println!("Genome: {:?}", best_individual.genome);
 
     if let Err(e) = plot_fitness_stats(gen_stats, "./plot.png") {
         eprintln!("Plot failed: {e}");
