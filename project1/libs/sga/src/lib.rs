@@ -79,6 +79,13 @@ impl Population {
     }
 }
 
+pub struct GenStats {
+    pub min: usize,
+    pub mean: f64,
+    pub max: usize,
+}
+
+
 fn tournament_selection(population: &Population, k: usize) -> &Individual {
 
     let mut r = rng();
@@ -131,7 +138,7 @@ pub fn sga(
     capacity: usize,
     optimal: usize,
     generations: usize,
-) -> Individual {
+) -> (Individual, Vec<GenStats>) {
     // Initialize population
     let mut population = Population::new(pop_size, items);
 
@@ -140,7 +147,8 @@ pub fn sga(
     let mut best_score = 0;
 
     let mut new_individuals = Vec::<Individual>::with_capacity(pop_size);
-    
+    let mut gen_stats = Vec::<GenStats>::with_capacity(generations);
+
     for _gen in 1..=generations {
         println!("Generation {:?}", _gen);
         
@@ -181,9 +189,11 @@ pub fn sga(
             new_individuals.extend_from_slice(&[Individual::from_genome(mutant1), Individual::from_genome(mutant2)]);
         }
 
+        gen_stats.push(GenStats {min: 0, mean: 0.5, max: 1});
+
     }
     
-    population.individuals[best_fit_index].clone()
+    (population.individuals[best_fit_index].clone(), gen_stats)
 }
 
 #[cfg(test)]

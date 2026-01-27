@@ -1,6 +1,7 @@
 use std::{error::Error, fs::File};
-use lib_sga::{Item, sga};
+use lib_sga::{GenStats, Item, sga};
 use csv::StringRecord;
+use plotters::prelude::*;
 
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -17,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Hyperparameters
     const POPULATION_SIZE: usize = 100;
-    const GENERATIONS: usize = 5;
+    const GENERATIONS: usize = 50;
 
     let file = String::from("knapsack/knapPI_12_500_1000_82.csv");
 
@@ -26,9 +27,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(format!("No items read from file {file}").into());
     }
 
-    let best_individual = sga(&items, POPULATION_SIZE, CAPACITY, OPTIMAL, GENERATIONS);
+    let (best_individual, gen_stats) = sga(&items, POPULATION_SIZE, CAPACITY, OPTIMAL, GENERATIONS);
 
     println!("Result of algorithm: {:?}", best_individual.fitness_score);
+
+    plot_fitness_stats(gen_stats, "./plot.png");
 
     Ok(())
 }
@@ -53,4 +56,50 @@ fn read_from_file(path: &String) -> Result<Vec<Item>, Box<dyn Error>> {
     }
 
     Ok(items)
+}
+
+fn plot_fitness_stats(stats: Vec<GenStats>, out_path: &str) -> Result<(), Box<dyn Error>> {
+    let root = BitMapBackend::new(out_path, (900, 600)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let max_gen = stats.len().saturating_sub(1) as i32;
+    let max_fit = stats.iter().map(|s| s.max).max().unwrap_or(1) as i32;
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("SGA Fitness (min / mean / max)", ("sans-serif", 30))
+        .margin(20)
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        .build_cartesian_2d(0..max_gen, 0..max_fit)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("Generation")
+        .y_desc("Fitness")
+        .draw()?;
+
+    // Min
+    chart.draw_series(LineSeries::new(
+        stats.iter().enumerate().map(|(g, s)| (g as i32, s.min as i32)), &BLUE,
+    ))?
+    .label("min")
+    .legend(|(x,y)| PathElement::new(vec![(x,y), (x+20, y)], BLUE));
+
+    // Mean
+    chart.draw_series(LineSeries::new(
+        stats.iter().enumerate().map(|(g, s)| (g as i32, s.mean.round() as i32)), &GREEN,
+    ))?
+    .label("mean")
+    .legend(|(x,y)| PathElement::new(vec![(x,y), (x+20, y)], GREEN));
+
+    // Max
+    chart.draw_series(LineSeries::new(
+        stats.iter().enumerate().map(|(g, s)| (g as i32, s.max as i32)), &RED,
+    ))?
+    .label("max")
+    .legend(|(x,y)| PathElement::new(vec![(x,y), (x+20, y)], RED));
+
+    chart.configure_series_labels().border_style(BLACK).draw()?;
+
+    Ok(())
 }
