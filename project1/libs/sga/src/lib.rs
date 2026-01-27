@@ -29,6 +29,15 @@ impl Individual {
         }
     }
 
+    fn from_genome(genome: Vec<bool>) -> Self {
+        Self {
+            genome,
+            profit: 0,
+            weight: 0,
+            fitness_score: 0,
+        }
+    }
+
     fn fitness(&mut self, items: &[Item], capacity: &usize) {
         self.profit = 0;
         self.weight = 0;
@@ -70,6 +79,39 @@ impl Population {
     }
 }
 
+fn tournament_selection(population: &Population, k: usize) -> &Individual {
+
+    let mut r = rng();
+    let n = population.individuals.len();
+
+    let mut best_index = r.random_range(0..n);
+
+    for _ in 1..k {
+        let idx = r.random_range(0..n);
+        if population.individuals[idx].fitness_score > population.individuals[best_index].fitness_score {
+            best_index = idx;
+        }
+    }
+
+    &population.individuals[best_index]
+}
+
+fn single_point_crossover(p1: &Individual, p2: &Individual, point: usize) -> (Individual, Individual) {
+
+    let (h1, t1) = p1.genome.split_at(point);
+    let (h2, t2) = p2.genome.split_at(point);
+
+    let mut g1 = Vec::with_capacity(p1.genome.len());
+    g1.extend_from_slice(h1);
+    g1.extend_from_slice(t2);
+
+    let mut g2 = Vec::with_capacity(p2.genome.len());
+    g2.extend_from_slice(h2);
+    g2.extend_from_slice(t1);
+
+    (Individual::from_genome(g1), Individual::from_genome(g2))
+}
+
 pub fn sga(
     items: &[Item],
     pop_size: usize,
@@ -99,6 +141,14 @@ pub fn sga(
                 );
             }
         }
+
+        let parent1 = tournament_selection(&population, 5);
+        let parent2 = tournament_selection(&population, 5);
+        
+        let crossover_point = parent1.genome.len() / 2;
+        
+        let (offspring1, offspring2) = single_point_crossover(parent1, parent2, crossover_point);
+
     }
 
     population.individuals[best_fit_index].clone()
@@ -143,5 +193,20 @@ mod tests {
         assert_eq!(individual2.profit, 0);
         assert_eq!(individual2.weight, 0);
         assert_eq!(individual2.fitness_score, 0);
+    }
+
+    #[test]
+    fn test_single_point_crossover() {
+
+        let genome1 = vec![true, true, true, true, true, true, true, true, true, true,];
+        let genome2 = vec![false, false, false, false, false, false, false, false, false, false,];
+
+        let i1 = Individual::from_genome(genome1);
+        let i2 = Individual::from_genome(genome2);
+
+        let (o1, o2) = single_point_crossover(&i1, &i2, 5);
+
+        assert_eq!(vec![true, true, true, true, true, false, false, false, false, false, ], o1.genome);
+        assert_eq!(vec![false, false, false, false, false, true, true, true, true, true, ], o2.genome);
     }
 }
