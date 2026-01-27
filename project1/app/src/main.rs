@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Hyperparameters
     const POPULATION_SIZE: usize = 100;
-    const GENERATIONS: usize = 1;
+    const GENERATIONS: usize = 5;
 
     let file = String::from("knapsack/knapPI_12_500_1000_82.csv");
 

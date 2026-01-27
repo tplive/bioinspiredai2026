@@ -112,6 +112,19 @@ fn single_point_crossover(p1: &Individual, p2: &Individual, point: usize) -> (In
     (Individual::from_genome(g1), Individual::from_genome(g2))
 }
 
+fn mutate(individual: &Individual, probability: f64) -> Vec<bool> {
+    let mut r = rng();
+    let genome = individual.genome.clone();
+
+    let mut mutant = Vec::with_capacity(genome.len());
+    for b in genome {
+        let flip = r.random_bool(probability);
+        mutant.push(if flip { !b } else { b });
+    }
+
+    mutant
+}
+
 pub fn sga(
     items: &[Item],
     pop_size: usize,
@@ -126,8 +139,15 @@ pub fn sga(
     let mut best_fit_index = 0;
     let mut best_score = 0;
 
+    let mut new_individuals = Vec::<Individual>::with_capacity(pop_size);
+    
     for _gen in 1..=generations {
         println!("Generation {:?}", _gen);
+        
+        if _gen > 1 {
+            population.individuals = new_individuals.clone();
+            new_individuals.clear();
+        }
 
         for (index, i) in population.iter_mut().enumerate() {
             i.fitness(items, &capacity);
@@ -141,16 +161,28 @@ pub fn sga(
                 );
             }
         }
+        
+        for _sel in 0..pop_size / 2 {
 
-        let parent1 = tournament_selection(&population, 5);
-        let parent2 = tournament_selection(&population, 5);
-        
-        let crossover_point = parent1.genome.len() / 2;
-        
-        let (offspring1, offspring2) = single_point_crossover(parent1, parent2, crossover_point);
+            // Tournament selection of parents
+            let parent1 = tournament_selection(&population, 5);
+            let parent2 = tournament_selection(&population, 5);
+            
+            // Cross over parents genomes
+            let crossover_point = parent1.genome.len() / 2;
+            
+            let (offspring1, offspring2) = single_point_crossover(parent1, parent2, crossover_point);
+            
+            // Mutate the offspring
+            let prob = 0.01;
+            let (mutant1, mutant2) = (mutate(&offspring1, prob), mutate(&offspring2, prob));
+                        
+            // Populate new_individuals with the (possibly mutated) mutants
+            new_individuals.extend_from_slice(&[Individual::from_genome(mutant1), Individual::from_genome(mutant2)]);
+        }
 
     }
-
+    
     population.individuals[best_fit_index].clone()
 }
 
@@ -208,5 +240,22 @@ mod tests {
 
         assert_eq!(vec![true, true, true, true, true, false, false, false, false, false, ], o1.genome);
         assert_eq!(vec![false, false, false, false, false, true, true, true, true, true, ], o2.genome);
+    }
+
+    #[test]
+    fn test_mutate() {
+
+        let genome = vec![true, true, true, true, true, true];
+        let probability = 0.0;
+        let mutant = mutate(&Individual::from_genome(genome), probability);
+        assert_eq!(vec![true, true, true, true, true, true], mutant);
+
+        let genome = vec![true, true, true, true, true, true];
+        let probability = 1.0;
+        let mutant = mutate(&Individual::from_genome(genome), probability);
+        assert_eq!(vec![false, false, false, false, false, false], mutant);
+
+
+
     }
 }
