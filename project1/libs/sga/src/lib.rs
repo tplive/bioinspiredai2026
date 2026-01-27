@@ -169,6 +169,21 @@ pub fn sga(
                 );
             }
         }
+
+        let mut min_fit = usize::MAX;
+        let mut max_fit = 0usize;
+        let mut sum_fit = 0usize;
+
+        for ind in population.individuals.iter() {
+            let f = ind.fitness_score;
+            min_fit = min_fit.min(f);
+            max_fit = max_fit.max(f);
+            sum_fit += f;
+        }
+
+        let mean_fit = sum_fit as f64 / population.individuals.len() as f64;
+        
+        gen_stats.push(GenStats {min: min_fit, mean: mean_fit, max: max_fit});
         
         for _sel in 0..pop_size / 2 {
 
@@ -189,7 +204,6 @@ pub fn sga(
             new_individuals.extend_from_slice(&[Individual::from_genome(mutant1), Individual::from_genome(mutant2)]);
         }
 
-        gen_stats.push(GenStats {min: 0, mean: 0.5, max: 1});
 
     }
     

@@ -1,4 +1,4 @@
-use std::{error::Error, fs::File};
+use std::{error::Error, fs::File, iter::once};
 use lib_sga::{GenStats, Item, sga};
 use csv::StringRecord;
 use plotters::prelude::*;
@@ -98,6 +98,21 @@ fn plot_fitness_stats(stats: Vec<GenStats>, out_path: &str) -> Result<(), Box<dy
     ))?
     .label("max")
     .legend(|(x,y)| PathElement::new(vec![(x,y), (x+20, y)], RED));
+
+    // Plot the final values (last generation)
+    if let Some(last) = stats.last() {
+        let g = max_gen;
+
+        // Points
+        chart.draw_series(once(Circle::new((g, last.max as i32), 4, RED.filled())))?;
+
+        // Labels
+        chart.draw_series(once(Text::new(
+            format!("max={}", last.max),
+            (g-6, (last.max as i32)-10),
+            ("sans-serif", 16).into_font().color(&RED),
+        )))?;
+    }
 
     chart.configure_series_labels().border_style(BLACK).draw()?;
 
