@@ -3,22 +3,11 @@ use std::{error::Error, fs::File};
 use csv::StringRecord;
 use rand::{Rng, rng};
 
-struct Chromosome {
-    pub genes: Vec<bool>, // true if feature is selected/included
-    pub fitness: Option<f64>, // RMSE
-}
 
-impl Chromosome {
-    pub fn new(number_of_features: usize) -> Self {
-        let mut r = rng();
-        let genes = (0..number_of_features).map(|_| r.random_bool(0.5)).collect();
+mod chromosome;
+mod ga;
+use ga::GeneticAlgorithm;
 
-        Self {
-            genes,
-            fitness: None,
-        }
-    }
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     
@@ -36,9 +25,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("All rows have {} features", expected);
+    println!("Data shape {} rows x {} features", items.len(), expected);
 
-    
+    let mut ga = GeneticAlgorithm {
+        population_size: 100,
+        num_features: 102,
+    };
+
+    ga.run();
+
     Ok(())
 }
 
