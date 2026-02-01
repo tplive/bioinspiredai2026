@@ -1,13 +1,12 @@
 use std::{error::Error, fs::File};
 
 use csv::StringRecord;
-use rand::{Rng, rng};
 
 
 mod chromosome;
 mod ga;
 use ga::GeneticAlgorithm;
-
+mod fitness_evaluator;
 
 fn main() -> Result<(), Box<dyn Error>> {
     
@@ -32,12 +31,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         num_features: 102,
     };
 
+
+
     println!("Result: {:?}", ga.run().0);
 
     Ok(())
 }
 
 fn read_from_file(path: &String) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
+    // TODO: Refactor to use ndarray::Array2
     println!("Reading file {}", &path);
     let file = File::open(path)?;
 
