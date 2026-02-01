@@ -17,9 +17,22 @@ I implemented the fitness and machine learning function with Linear Regression f
 
 I ducked [1] for "Machine Learning with Rust" which led me to discover the `linfa` crate [2], which "aims to provide a comprehensive toolkit to build Machine Learning applications with Rust.", a scikit-learn equivalent for Rust. I decided to go with it for this project, despite its experimental status. I also decided to use the `ndarray` crate for supplying n-dimensional arrays, similar to well-known functionality in Python Numpy.
 
+## Parsing the dataset
+The dataset is a csv file shaped 1994x102. We aim to find the combination of features that will minimize RMSE when doing linear regression over the data. I was able to refit the `read_from_file` function from Part 1, adding checks to ensure that the data is shaped as indicated.
 
+## Chromosome
+A Chromosome in this function is the list of booleans representing genes, 0 for off, 1 for on. A Chromosome for this dataset will have 102 genes, one for each feature. By turning them on and off we aim to find the best fit. Training on a randomized population of chromosomes will yield some result for which we can calculate RMSE.
 
+## Calculate RMSE
 
+$$ \text{RMSE}(y, \hat{y}) = \sqrt{\frac{\sum_{i=0}^{N - 1} (y_i - \hat{y}_i)^2}{N}} $$
+
+In Rust code, this function is implemented like this:
+1. Create an iterator over the predictions (iter())
+2. Pair (zip) the predicted and actual values
+3. Subtract actual value from the prediction using map and square it
+4. Sum all squared errors
+5. Take the square root of sum divided by number of values
 
 
 
