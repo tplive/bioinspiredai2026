@@ -1,3 +1,7 @@
+use std::path::MAIN_SEPARATOR;
+
+use rand::seq::IndexedRandom;
+
 use crate::{chromosome::Chromosome, fitness_evaluator::FitnessEvaluator};
 
 
@@ -5,6 +9,7 @@ pub struct GeneticAlgorithm {
     pub population_size: usize,
     pub num_features: usize,
     pub max_generations: usize,
+    pub tournament_size: usize,
     pub evaluator: FitnessEvaluator,
 }
 
@@ -21,7 +26,16 @@ impl GeneticAlgorithm {
 
         for g in 0..self.max_generations {
 
-            
+            let mut offspring = Vec::new();
+
+            for _ in 0..(self.population_size / 2) {
+                let parent1 = tournament_selection(&population, self.tournament_size);
+                let parent2 = tournament_selection(&population, self.tournament_size);
+
+                offspring.push(parent1);
+                offspring.push(parent2);
+            }
+
             let best = population.iter()
             .min_by(|a, b| {
                 a.fitness.unwrap().partial_cmp(&b.fitness.unwrap()).unwrap()
@@ -51,4 +65,20 @@ impl GeneticAlgorithm {
             }
         }
     }
+}
+
+fn tournament_selection(population: &[Chromosome], tournament_size: usize) -> Chromosome {
+    let mut rng = rand::rng();
+
+    let tournament: Vec<&Chromosome> = population
+        .choose_multiple(&mut rng, tournament_size)
+        .collect();
+
+    tournament.iter()
+        .min_by(|a, b| {
+            a.fitness.unwrap().partial_cmp(&b.fitness.unwrap()).unwrap()
+        })
+        .unwrap()
+        .clone()
+        .clone()
 }

@@ -34,9 +34,22 @@ In Rust code, this function is implemented like this:
 4. Sum all squared errors
 5. Take the square root of sum divided by number of values
 
+## Putting it together
+The scaffolding is done when
+
+a) The Chromosome maps active/inactive genes
+b) RMSE (fitness) is calculated for a given set of genes
+c) The GA can run over several generations
+
+At this point, I'm seeing the same result every generation, but a new random Chromosome is created for each run. RMSE ~ 0.13.
+
+It's time to implement selection, mutation, cross-over, etc...
+
+## Parent selection
+
 
 
 
 ## References
-[1] Searching with Duck Duck Go
+[1] Searching with "Duck Duck Go"
 [2] Linfa website: https://rust-ml.github.io/linfa/, crate page: https://crates.io/crates/linfa, docs: https://rust-ml.github.io/linfa/rustdocs/linfa/

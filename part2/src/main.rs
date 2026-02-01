@@ -1,15 +1,13 @@
 use std::error::Error;
-
 use csv::{ReaderBuilder, StringRecord};
-
+use ndarray::{Array1, Array2, s};
 
 mod chromosome;
 mod ga;
 use ga::GeneticAlgorithm;
-use ndarray::{Array1, Array2, s};
 
-use crate::fitness_evaluator::FitnessEvaluator;
 mod fitness_evaluator;
+use crate::fitness_evaluator::FitnessEvaluator;
 
 fn main() -> Result<(), Box<dyn Error>> {
     
@@ -31,6 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         population_size: 10,
         num_features: 101,
         max_generations: 10,
+        tournament_size: 5,
         evaluator,
     };
 
@@ -38,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Best solution found:");
     println!("Features selected: {}", best_genes.num_selected());
-    println!("RMSE: {}", best_genes.fitness.unwrap());
+    println!("RMSE: {:.6}", best_genes.fitness.unwrap());
 
     Ok(())
 }
