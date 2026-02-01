@@ -40,9 +40,7 @@ impl FitnessEvaluator {
 
         let pred = model.predict(&x_test_selected);
 
-        // TODO: IMplement RMSE
-        0.00055
-        
+        self.rmse(&pred, &self.y_text)
     }
 
     fn select_columns(&self, data_array: &Array2<f64>, indexes: &[usize]) -> Array2<f64> {
@@ -58,5 +56,16 @@ impl FitnessEvaluator {
         }
 
         result
+    }
+
+    // From 
+    fn rmse(&self, predictions: &Array1<f64>, actual: &Array1<f64>) -> f64 {
+        let n = predictions.len() as f64;
+        let sum_squared_error: f64 = predictions.iter()
+            .zip(actual.iter())
+            .map(|(pred, actual)| (pred - actual).powi(2))
+            .sum();
+
+        (sum_squared_error / n).sqrt()
     }
 }
