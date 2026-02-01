@@ -1,6 +1,6 @@
 use rand::{Rng, rng};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chromosome {
     pub genes: Vec<bool>, // true if feature is selected/included
     pub fitness: Option<f64>, // RMSE
@@ -22,5 +22,9 @@ impl Chromosome {
             genes,
             fitness: None,
         }
+    }
+
+    pub fn num_selected(&self) -> usize {
+        self.genes.iter().filter(|&&g| g).count()
     }
 }
