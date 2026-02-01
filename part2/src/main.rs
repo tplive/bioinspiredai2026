@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut ga = GeneticAlgorithm {
         population_size: 10,
         num_features: 101,
+        max_generations: 10,
         evaluator,
     };
 
