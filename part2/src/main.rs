@@ -30,6 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         num_features: 101,
         max_generations: 10,
         tournament_size: 5,
+        crossover_rate: 0.9,
+        radiation_levels: 0.01,
         evaluator,
     };
 
