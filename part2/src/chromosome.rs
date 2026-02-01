@@ -1,5 +1,6 @@
 use rand::{Rng, rng};
 
+#[derive(Debug)]
 pub struct Chromosome {
     pub genes: Vec<bool>, // true if feature is selected/included
     pub fitness: Option<f64>, // RMSE

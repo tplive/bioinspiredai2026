@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         num_features: 102,
     };
 
-    ga.run();
+    println!("Result: {:?}", ga.run().0);
 
     Ok(())
 }
