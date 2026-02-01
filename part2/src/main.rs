@@ -1,63 +1,78 @@
-use std::{error::Error, fs::File};
+use std::error::Error;
 
-use csv::StringRecord;
+use csv::{ReaderBuilder, StringRecord};
 
 
 mod chromosome;
 mod ga;
 use ga::GeneticAlgorithm;
+use ndarray::{Array1, Array2, s};
+
+use crate::fitness_evaluator::FitnessEvaluator;
 mod fitness_evaluator;
 
 fn main() -> Result<(), Box<dyn Error>> {
     
     let file = "feature_selection/dataset.txt".to_string();
 
-    let items = read_from_file(&file)?;
-    if items.is_empty() {
-        return Err(format!("No items read from file {}", &file).into());
-    }
+    let (x, y) = load_dataset(&file);
 
-    let expected = items[0].len();
-    for (i, row) in items.iter().enumerate() {
-        if row.len() != expected {
-            return Err(format!("Row {} has {} features, expected {}", i, row.len(), expected).into());
-        }
-    }
+    // Train / test split at 80/20
+    let split_at = (x.nrows() as f64 * 0.8) as usize;
 
-    println!("Data shape {} rows x {} features", items.len(), expected);
+    let x_train = x.slice(s![..split_at, ..]).to_owned();
+    let y_train = y.slice(s![..split_at]).to_owned();
+    let x_test = x.slice(s![split_at.., ..]).to_owned();
+    let y_test = y.slice(s![split_at..]).to_owned();
+
+    let evaluator = FitnessEvaluator::new(x_train, y_train, x_test, y_test);
 
     let mut ga = GeneticAlgorithm {
-        population_size: 100,
-        num_features: 102,
+        population_size: 10,
+        num_features: 101,
+        evaluator,
     };
 
+    let (best_genes, history) = ga.run();
 
-
-    println!("Result: {:?}", ga.run().0);
+    println!("Best solution found:");
+    println!("Features selected: {}", best_genes.num_selected());
+    println!("RMSE: {}", best_genes.fitness.unwrap());
 
     Ok(())
 }
 
-fn read_from_file(path: &String) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
-    // TODO: Refactor to use ndarray::Array2
-    println!("Reading file {}", &path);
-    let file = File::open(path)?;
+fn load_dataset(path: &String) -> (Array2<f64>, Array1<f64>) {
 
-    let mut readerbuilder = csv::ReaderBuilder::new()
+    println!("Reading file {}", &path);
+    let mut readerbuilder = ReaderBuilder::new()
         .has_headers(false)
-        .from_reader(file);
+        .from_path(path)
+        .unwrap();
 
     let mut items = Vec::new();
-    for record in readerbuilder.records() {
-        let r: StringRecord = record?;
 
-        let item: Vec<f64> = r
-            .iter()
-            .map(|f| f.parse::<f64>())
-            .collect::<Result<Vec<_>, _>>()?;        
+    for record in readerbuilder.records() {
+        let r: StringRecord = record.unwrap();
+
+        let item: Vec<f64> = r.iter()
+            .map(|f| f.parse::<f64>().unwrap())
+            .collect();        
         items.push(item);
-    
     }
 
-    Ok(items)
+    let rows = items.len();
+    let cols = items[0].len();
+
+    let x = items.iter()
+        .flat_map(|row| row[..cols-1].iter().copied())
+        .collect();
+    let y = items.iter()
+        .map(|row| row[cols-1])
+        .collect();
+
+    let x_array = Array2::from_shape_vec((rows, cols - 1), x).unwrap();
+    let y_array = Array1::from_vec(y);
+
+    (x_array, y_array)
 }
