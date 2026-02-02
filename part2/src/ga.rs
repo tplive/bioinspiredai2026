@@ -1,8 +1,6 @@
-use std::path::MAIN_SEPARATOR;
-
 use rand::{Rng, seq::IndexedRandom};
 
-use crate::{chromosome::{self, Chromosome}, fitness_evaluator::FitnessEvaluator};
+use crate::{chromosome::{Chromosome}, fitness_evaluator::FitnessEvaluator};
 
 pub struct GeneticAlgorithm {
     pub population_size: usize,
@@ -124,7 +122,6 @@ fn tournament_selection(population: &[Chromosome], tournament_size: usize) -> Ch
         .min_by(|a, b| {
             a.fitness.unwrap().partial_cmp(&b.fitness.unwrap()).unwrap()
         })
+        .map(|c| (**c).clone())
         .unwrap()
-        .clone()
-        .clone()
 }
