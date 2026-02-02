@@ -38,12 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("-----------------------------------");
 
     let mut ga = GeneticAlgorithm {
-        population_size: 100,
+        population_size: 300,
         num_features: 101,
-        max_generations: 100,
-        tournament_size: 5,
+        max_generations: 200,
+        tournament_size: 3,
         crossover_rate: 0.9,
-        radiation_levels: 0.0001,
+        radiation_levels: 0.01,
+        elite_count: 5,
         evaluator,
     };
 
@@ -51,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Best solution found:");
     println!("Number of features selected: {}", best_genes.num_selected());
-    println!("Pop={},Gen={},Tsize={},COrate={},Mrate={}", ga.population_size, ga.max_generations, ga.tournament_size, ga.crossover_rate, ga.radiation_levels);
+    println!("Pop={},Gen={},Tsize={},COrate={},Mrate={},Ecount={}", ga.population_size, ga.max_generations, ga.tournament_size, ga.crossover_rate, ga.radiation_levels, ga.elite_count);
     println!("RMSE: {:.6}", best_genes.fitness.unwrap());
     println!("History of RMSE: {:?}", history);
 
