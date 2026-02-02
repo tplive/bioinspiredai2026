@@ -27,4 +27,11 @@ impl Chromosome {
     pub fn num_selected(&self) -> usize {
         self.genes.iter().filter(|&&g| g).count()
     }
+    
+    pub fn hamming_distance(&self, other: &Chromosome) -> usize {
+        self.genes.iter()
+            .zip(other.genes.iter())
+            .filter(|(a, b)| a != b)
+            .count()
+    }
 }
