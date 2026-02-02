@@ -1,15 +1,17 @@
-use std::error::Error;
+use std::{error::Error, time::Instant};
 use csv::{ReaderBuilder, StringRecord};
 use ndarray::{Array1, Array2, s};
 
 mod chromosome;
 mod ga;
 use ga::GeneticAlgorithm;
+use sysinfo::{System, get_current_pid};
 
 mod fitness_evaluator;
 use crate::fitness_evaluator::FitnessEvaluator;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let now = Instant::now();
     
     let file = "feature_selection/dataset.txt".to_string();
 
@@ -26,9 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let evaluator = FitnessEvaluator::new(x_train, y_train, x_test, y_test);
 
     let mut ga = GeneticAlgorithm {
-        population_size: 10,
+        population_size: 100,
         num_features: 101,
-        max_generations: 10,
+        max_generations: 100,
         tournament_size: 5,
         crossover_rate: 0.9,
         radiation_levels: 0.01,
@@ -40,6 +42,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Best solution found:");
     println!("Features selected: {}", best_genes.num_selected());
     println!("RMSE: {:.6}", best_genes.fitness.unwrap());
+
+    // Report memory usage and running time
+    let mut system = System::new_all();
+    system.refresh_all();
+    let process = system.process(get_current_pid().unwrap()).unwrap();
+    println!("Memory usage: {:.2} MB", process.memory() as f64 / 1024.0);
+    println!("Total running time: {:.2?}", now.elapsed());
 
     Ok(())
 }
