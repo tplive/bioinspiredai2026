@@ -4,7 +4,6 @@ use rand::{Rng, seq::IndexedRandom};
 
 use crate::{chromosome::{self, Chromosome}, fitness_evaluator::FitnessEvaluator};
 
-
 pub struct GeneticAlgorithm {
     pub population_size: usize,
     pub num_features: usize,
@@ -23,7 +22,8 @@ impl GeneticAlgorithm {
             .collect();
         
         self.evaluate_population(&mut population);
-
+        
+        // Run over generations
         let mut best_fitness_history: Vec<f64> = Vec::new();
 
         for g in 0..self.max_generations {
@@ -45,7 +45,7 @@ impl GeneticAlgorithm {
 
                 // Mutation
                 bit_flip_mutation(&mut child1, self.radiation_levels);
-                bit_flip_mutation(&mut child1, self.radiation_levels);
+                bit_flip_mutation(&mut child2, self.radiation_levels);
                 
                 offspring.push(child1);
                 offspring.push(child2);
@@ -64,7 +64,7 @@ impl GeneticAlgorithm {
         
         best_fitness_history.push(best.fitness.unwrap());
         
-        println!("Generation {}: Best RMSE = {:.6}", g, best.fitness.unwrap());
+        println!("Generation {}: Best RMSE = {:.6}", g+1, best.fitness.unwrap());
     }
 
     let best = population.iter()

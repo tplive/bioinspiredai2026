@@ -8,7 +8,7 @@ use ga::GeneticAlgorithm;
 use sysinfo::{System, get_current_pid};
 
 mod fitness_evaluator;
-use crate::fitness_evaluator::FitnessEvaluator;
+use crate::{chromosome::Chromosome, fitness_evaluator::FitnessEvaluator};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let now = Instant::now();
@@ -27,27 +27,39 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let evaluator = FitnessEvaluator::new(x_train, y_train, x_test, y_test);
 
+    // Part 2, task f) Show results with all features selected
+    let all_features = vec![true; x.ncols()];
+    let baseline = Chromosome::from_genes(all_features);
+    let baseline_rmse = evaluator.evaluate(&baseline);
+
+    println!("Task f) Best solution without feature selection:");
+    println!("Features in use: {}", baseline.num_selected());
+    println!("RMSE: {:.6}", baseline_rmse);
+    println!("-----------------------------------");
+
     let mut ga = GeneticAlgorithm {
         population_size: 100,
         num_features: 101,
         max_generations: 100,
         tournament_size: 5,
         crossover_rate: 0.9,
-        radiation_levels: 0.01,
+        radiation_levels: 0.0001,
         evaluator,
     };
 
     let (best_genes, history) = ga.run();
 
     println!("Best solution found:");
-    println!("Features selected: {}", best_genes.num_selected());
+    println!("Number of features selected: {}", best_genes.num_selected());
+    println!("Pop={},Gen={},Tsize={},COrate={},Mrate={}", ga.population_size, ga.max_generations, ga.tournament_size, ga.crossover_rate, ga.radiation_levels);
     println!("RMSE: {:.6}", best_genes.fitness.unwrap());
+    println!("History of RMSE: {:?}", history);
 
     // Report memory usage and running time
     let mut system = System::new_all();
     system.refresh_all();
     let process = system.process(get_current_pid().unwrap()).unwrap();
-    println!("Memory usage: {:.2} MB", process.memory() as f64 / 1024.0);
+    println!("Memory usage: {:.2} MB", (process.memory() as f64 / 1024.0 / 1024.0) );
     println!("Total running time: {:.2?}", now.elapsed());
 
     Ok(())
