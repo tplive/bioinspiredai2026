@@ -174,7 +174,7 @@ fn run_with_params(
         max_generations: g,
         tournament_size: t,
         crossover_rate: c,
-        radiation_levels: m,
+        mutation_rate: m,
         elite_count: e,
         evaluator,
     };
