@@ -93,6 +93,25 @@ Pop=300,Gen=200,Tsize=3,COrate=0.9,Mrate=0.01,Ecount=5
 RMSE: 0.122760
 ```
 
+I parallellize the code to run a grid search with several parameters like this:
+```rust
+let pop_sizes = [100, 200];
+    let gen_sets = [100, 200];
+    let t_sizes = [3, 5];
+    let c_rates = [0.7, 0.9];
+    let m_rates = [0.05, 0.01];
+    let elites = [0, 2, 5];
+```
+The grid search yields the same result:
+```bash
+# In parallel, gridsearch
+
+Best RMSE: 0.122760
+Best params: (200, 100, 3, 0.9, 0.01, 5)
+Memory usage: 79.17 MB
+Total running time: 912.36s
+```
+
 ### h)
 
 
