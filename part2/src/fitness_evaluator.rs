@@ -6,8 +6,8 @@ use crate::chromosome::Chromosome;
 pub struct FitnessEvaluator {
     x_train: Array2<f64>,
     y_train: Array1<f64>,
-    x_text: Array2<f64>,
-    y_text: Array1<f64>,
+    x_test: Array2<f64>,
+    y_test: Array1<f64>,
 }
 
 impl FitnessEvaluator {
@@ -17,7 +17,7 @@ impl FitnessEvaluator {
         x_text: Array2<f64>,
         y_text: Array1<f64>,
     ) -> Self {
-        Self { x_train, y_train, x_text, y_text }
+        Self { x_train, y_train, x_test: x_text, y_test: y_text }
     }
 
     pub fn evaluate(&self, chromosome: &Chromosome) -> f64 {
@@ -33,14 +33,14 @@ impl FitnessEvaluator {
         }
 
         let x_train_selected = self.select_columns(&self.x_train, &genes_in_the_sack);
-        let x_test_selected = self.select_columns(&self.x_text, &genes_in_the_sack);
+        let x_test_selected = self.select_columns(&self.x_test, &genes_in_the_sack);
 
         let dataset = Dataset::new(x_train_selected, self.y_train.clone());
         let model = LinearRegression::default().fit(&dataset).unwrap();
 
         let pred = model.predict(&x_test_selected);
 
-        self.rmse(&pred, &self.y_text)
+        self.rmse(&pred, &self.y_test)
     }
 
     fn select_columns(&self, data_array: &Array2<f64>, indexes: &[usize]) -> Array2<f64> {
