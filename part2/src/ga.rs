@@ -8,7 +8,7 @@ pub struct GeneticAlgorithm {
     pub max_generations: usize,
     pub tournament_size: usize,
     pub crossover_rate: f64,
-    pub radiation_levels: f64,
+    pub mutation_rate: f64,
     pub elite_count: usize,
     pub evaluator: FitnessEvaluator,
 }
@@ -43,8 +43,8 @@ impl GeneticAlgorithm {
                 };
 
                 // Mutation
-                bit_flip_mutation(&mut child1, self.radiation_levels);
-                bit_flip_mutation(&mut child2, self.radiation_levels);
+                bit_flip_mutation(&mut child1, self.mutation_rate);
+                bit_flip_mutation(&mut child2, self.mutation_rate);
                 
                 offspring.push(child1);
                 offspring.push(child2);
@@ -52,8 +52,10 @@ impl GeneticAlgorithm {
 
             self.evaluate_population(&mut offspring);
 
-            population = elitism_selection(&mut population, &offspring, self.elite_count);
+            //population = elitism_selection(&mut population, &offspring, self.elite_count);
             //population = deterministic_crowding(&population, &offspring);
+            population = offspring;
+
 
             let best = population.iter()
             .min_by(|a, b| {
