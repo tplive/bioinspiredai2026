@@ -47,14 +47,12 @@ c) The GA can run over several generations
 
 At this point, I'm seeing the same result every generation, but a new random Chromosome is created for each run. RMSE ~ 0.13.
 
-It's time to implement selection, mutation, cross-over, etc...
-
 ## Crowding
 Parent selection is done with the tournament_selection function; pick k individuals randomly from the population, and return the one with the highest fitness.
 
 Create two parents.
 
-Single-point-crossover chooses a crossover-point at random, splits the genes at that point, and recombines head from parent1 with tail from parent2 and vice versa, as child1 and child2.
+Single-point-crossover chooses a crossover-point at random, splits the genes at that point, and swaps the tail-end of the parents to create two new children.
 
 Bit-flip-mutation takes "radiation levels" (mutation rate) into account, and flips bits of the genome according to probability.
 
@@ -64,7 +62,7 @@ This steps calculates fitness for each individual (chromosome) of the population
 ## Tasks
 
 ### f) Best solution without feature selection:
-Most trials have yielded $\approx0.135$. See code in ga.rs that calculates this before looping over generations.
+Most trials have yielded $\approx0.135$. See `run_evaluator_with_all_features()` in `ga.rs` that borrows the dataset and calculates this value once with all features before moving into the parallelized grid search.
 
 ### g) Playing with hyperparameters
 |#|Hyperparameters|RMSE|Comment|
@@ -92,8 +90,11 @@ Number of features selected: 58
 Pop=300,Gen=200,Tsize=3,COrate=0.9,Mrate=0.01,Ecount=5
 RMSE: 0.122760
 ```
+## Parallization and grid search
+I parallellize using the Rayon crate. It takes care of cloning the FitnessEvaluator across all cores.
 
-I parallellize the code to run a grid search with several parameters like this:
+I set up a grid of hyperparameters to search several combinations (aka gridsearch), inspired by [3].
+These are the parameters I chose for the grid:
 ```rust
 let pop_sizes = [100, 200];
     let gen_sets = [100, 200];
@@ -102,21 +103,34 @@ let pop_sizes = [100, 200];
     let m_rates = [0.05, 0.01];
     let elites = [0, 2, 5];
 ```
-The grid search yields the same result:
-```bash
-# In parallel, gridsearch
 
+The grid search yields the same result as before:
+```bash
 Best RMSE: 0.122760
 Best params: (200, 100, 3, 0.9, 0.01, 5)
 Memory usage: 79.17 MB
 Total running time: 912.36s
 ```
 
-### h)
+### h) Implement two new survivor selection functions
+I have implemented `deterministic_crowding()`; 
+1. Compute Hamming distance between parent and offspring.
+2. Pair each parent with most similar (closest Hamming distance) offspring.
+3. For each pair, keep the fitter individual.
 
+This should keep offspring that are close to their parents, reducing premature convergence.
+
+I implemented `elitism_selection()`;
+1. Sort population by fitness,
+2. Keep the `elite_count` number of best individuals.
+3. Backfill the rest of the population with offspring.
+
+This should accelerate convergence, but will reduce diversity.
 
 
 ## References
 [1] Searching with "Duck Duck Go"
 
 [2] Linfa website: https://rust-ml.github.io/linfa/, crate page: https://crates.io/crates/linfa, docs: https://rust-ml.github.io/linfa/rustdocs/linfa/
+
+[3] Géron, A. (2022). _Hands-On Machine Learning with Scikit-Learn, Keras and Tensorflow_ (3rd ed) O'Reilly Media, p.91-93
