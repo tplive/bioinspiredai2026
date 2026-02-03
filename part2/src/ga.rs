@@ -87,7 +87,7 @@ impl GeneticAlgorithm {
 }
 
 fn elitism_selection(
-    population: &mut Vec<Chromosome>, 
+    population: &mut [Chromosome], 
     offspring: &[Chromosome], 
     elite_count: usize,) -> Vec<Chromosome> {
     
