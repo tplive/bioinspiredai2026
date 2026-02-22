@@ -1,0 +1,9 @@
+[package]
+name = "project2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+genevo = "0.7.1"
+serde_json = "1"
+rand = "0.8"
