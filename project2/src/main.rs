@@ -1,3 +1,4 @@
+mod config;
 mod crossover;
 mod fitness;
 mod mutation;
@@ -5,7 +6,10 @@ mod parse;
 mod population;
 mod types;
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
+
+use clap::Parser;
+use config::PartialConfig;
 
 use genevo::{
     operator::prelude::*,
@@ -19,87 +23,168 @@ use fitness::{compute_individual, Genome, NurseFitness};
 use mutation::{MutationType, NurseMutation};
 use population::{NearestNeighbourGenomeBuilder, RandomGenomeBuilder};
 
-// ── Default hyper-parameters (all overridable via CLI) ───────────────────────
+// ── CLI definition ────────────────────────────────────────────────────────────
 
-const DEFAULT_FILE: &str = "train/train_0.json";
-const DEFAULT_POP_SIZE: usize = 100;
-const DEFAULT_GENERATIONS: usize = 500;
-const DEFAULT_SELECTION_RATIO: f64 = 0.8;
-const DEFAULT_NUM_PARENTS: usize = 2; // individuals per parent group
-const DEFAULT_CROSSOVER_RATE: f64 = 0.85;
-const DEFAULT_MUTATION_RATE: f64 = 0.1;
-const DEFAULT_REINSERTION_RATIO: f64 = 0.85;
-const DEFAULT_PENALTY_FACTOR: f64 = 10.0;
+/// Configuration is resolved in this priority order (highest wins):
+///
+///   1. Built-in defaults
+///   2. TOML configuration file (--config / -C)
+///   3. Individual CLI flags
+///
+/// Example – run with a config file, overriding just the generation count:
+///
+///   project2 --config my.toml --generations 1000
+#[derive(Parser, Debug)]
+#[command(verbatim_doc_comment)]
+struct Cli {
+    /// Path to a TOML configuration file (optional; all keys are optional inside it too).
+    #[arg(short = 'C', long, value_name = "FILE")]
+    config: Option<PathBuf>,
+
+    /// Problem instance JSON file.
+    #[arg(short = 'f', long, value_name = "FILE")]
+    file: Option<String>,
+
+    /// Number of individuals in the population.
+    #[arg(short = 'p', long)]
+    pop_size: Option<usize>,
+
+    /// Maximum number of generations.
+    #[arg(short = 'g', long)]
+    generations: Option<usize>,
+
+    /// Fraction of the population forwarded to the parent pool [0.0–1.0].
+    #[arg(long)]
+    selection_ratio: Option<f64>,
+
+    /// Probability of applying crossover to each parent pair [0.0–1.0].
+    #[arg(long)]
+    crossover_rate: Option<f64>,
+
+    /// Probability that an individual is mutated [0.0–1.0].
+    #[arg(short = 'm', long)]
+    mutation_rate: Option<f64>,
+
+    /// Intra-route mutation operator: "swap" or "insert".
+    #[arg(long, value_name = "TYPE")]
+    mutation_type: Option<String>,
+
+    /// Fraction of offspring kept in the next generation [0.0–1.0].
+    #[arg(long)]
+    reinsertion_ratio: Option<f64>,
+
+    /// Multiplier applied to each unit of constraint violation.
+    #[arg(long)]
+    penalty_factor: Option<f64>,
+
+    /// Population initialisation method: "random" or "nn" (nearest-neighbour).
+    #[arg(short = 'i', long)]
+    init: Option<String>,
+}
+
+impl Cli {
+    fn into_partial(self) -> PartialConfig {
+        PartialConfig {
+            file:              self.file,
+            pop_size:          self.pop_size,
+            generations:       self.generations,
+            selection_ratio:   self.selection_ratio,
+            crossover_rate:    self.crossover_rate,
+            mutation_rate:     self.mutation_rate,
+            mutation_type:     self.mutation_type,
+            reinsertion_ratio: self.reinsertion_ratio,
+            penalty_factor:    self.penalty_factor,
+            init:              self.init,
+        }
+    }
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fn main() {
-    // ── Parse command-line arguments ──────────────────────────────────────────
-    // Usage: project2 [file] [pop_size] [generations] [mutation_rate] [init]
-    // init: "random" (default) | "nn" (nearest-neighbour)
-    let args: Vec<String> = std::env::args().collect();
-    let file = args.get(1).map(|s| s.as_str()).unwrap_or(DEFAULT_FILE);
-    let pop_size: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_POP_SIZE);
-    let generations: usize = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_GENERATIONS);
-    let mutation_rate: f64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(DEFAULT_MUTATION_RATE);
-    let init_method = args.get(5).map(|s| s.as_str()).unwrap_or("random");
+    // ── Parse CLI and resolve full configuration ───────────────────────────────
+    let cli = Cli::parse();
+
+    // Layer 1 → 2: start from defaults, overlay config file if given.
+    let base = match &cli.config {
+        Some(path) => config::load_file(path).unwrap_or_else(|e| {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }),
+        None => config::Config::default(),
+    };
+
+    // Layer 3: overlay explicit CLI flags on top.
+    let cfg = cli.into_partial().apply_onto(base);
+
+    let mutation_op_type = match cfg.mutation_type.as_str() {
+        "insert" => MutationType::Insert,
+        _ => MutationType::Swap,
+    };
 
     // ── Load problem instance ─────────────────────────────────────────────────
-    println!("Loading instance: {file}");
-    let ctx = Arc::new(parse::load_problem(file, DEFAULT_PENALTY_FACTOR));
+    println!("Loading instance: {}", cfg.file);
+    let ctx = Arc::new(parse::load_problem(&cfg.file, cfg.penalty_factor));
 
-    println!("Instance:       {}", ctx.instance.name);
-    println!("Nurses:         {}", ctx.instance.num_nurses);
-    println!("Capacity:       {}", ctx.instance.capacity);
-    println!("Patients:       {}", ctx.patients.len() - 1);
-    println!("Benchmark:      {:.2}", ctx.instance.benchmark);
-    println!("Population:     {pop_size}");
-    println!("Generations:    {generations}");
-    println!("Mutation rate:  {mutation_rate}");
-    println!("Init method:    {init_method}");
+    println!("Instance:         {}", ctx.instance.name);
+    println!("Nurses:           {}", ctx.instance.num_nurses);
+    println!("Capacity:         {}", ctx.instance.capacity);
+    println!("Patients:         {}", ctx.patients.len() - 1);
+    println!("Benchmark:        {:.2}", ctx.instance.benchmark);
+    println!("-");
+    println!("Population:       {}", cfg.pop_size);
+    println!("Generations:      {}", cfg.generations);
+    println!("Selection ratio:  {}", cfg.selection_ratio);
+    println!("Crossover rate:   {}", cfg.crossover_rate);
+    println!("Mutation rate:    {}", cfg.mutation_rate);
+    println!("Mutation type:    {}", cfg.mutation_type);
+    println!("Reinsertion ratio:{}", cfg.reinsertion_ratio);
+    println!("Penalty factor:   {}", cfg.penalty_factor);
+    println!("Init method:      {}", cfg.init);
     println!();
 
     // ── Build initial population ──────────────────────────────────────────────
-    let initial_population: Population<Genome> = match init_method {
+    let initial_population: Population<Genome> = match cfg.init.as_str() {
         "nn" => build_population()
             .with_genome_builder(NearestNeighbourGenomeBuilder::new(Arc::clone(&ctx)))
-            .of_size(pop_size)
+            .of_size(cfg.pop_size)
             .uniform_at_random(),
         _ => build_population()
             .with_genome_builder(RandomGenomeBuilder::new(Arc::clone(&ctx)))
-            .of_size(pop_size)
+            .of_size(cfg.pop_size)
             .uniform_at_random(),
     };
 
     // ── Set up fitness function and operators ─────────────────────────────────
     let fitness_fn = NurseFitness::new(Arc::clone(&ctx));
-    let crossover_op = RouteCrossover::new(Arc::clone(&ctx), DEFAULT_CROSSOVER_RATE);
-    let mutation_op = NurseMutation::new(mutation_rate, MutationType::Swap);
+    let crossover_op = RouteCrossover::new(Arc::clone(&ctx), cfg.crossover_rate);
+    let mutation_op = NurseMutation::new(cfg.mutation_rate, mutation_op_type);
 
     // ── Assemble simulation ───────────────────────────────────────────────────
     let mut sim = simulate(
         genetic_algorithm()
             .with_evaluation(fitness_fn.clone())
             .with_selection(MaximizeSelector::new(
-                DEFAULT_SELECTION_RATIO,
-                DEFAULT_NUM_PARENTS,
+                cfg.selection_ratio,
+                2, // parents per group (fixed at 2 for pairwise crossover)
             ))
             .with_crossover(crossover_op)
             .with_mutation(mutation_op)
             .with_reinsertion(ElitistReinserter::new(
                 fitness_fn,
                 false,
-                DEFAULT_REINSERTION_RATIO,
+                cfg.reinsertion_ratio,
             ))
             .with_initial_population(initial_population)
             .build(),
     )
-    .until(GenerationLimit::new(generations as u64))
+    .until(GenerationLimit::new(cfg.generations as u64))
     .build();
 
     // ── Run the simulation loop ───────────────────────────────────────────────
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
+    let mut best_generation: u64 = 0;
 
     println!("Running genetic algorithm...");
     println!("{:-<60}", "");
@@ -112,6 +197,7 @@ fn main() {
 
                 if bs.solution.fitness > best_fitness {
                     best_fitness = bs.solution.fitness;
+                    best_generation = step.iteration;
                     best_genome = Some(bs.solution.genome.clone());
 
                     // Decode the fitness value back to actual cost.
@@ -147,10 +233,7 @@ fn main() {
                     duration.fmt(),
                     processing_time.fmt()
                 );
-                println!(
-                    "Best fitness found in generation {}",
-                    step.result.best_solution.generation
-                );
+                println!("Best fitness found in generation {best_generation}");
 
                 if best_genome.is_none() {
                     best_genome = Some(step.result.best_solution.solution.genome.clone());
