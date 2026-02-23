@@ -30,3 +30,8 @@ penalty_factor   = 10.0   # multiplier per unit of constraint violation
 # "random" – shuffle all patient IDs and split evenly across nurses
 # "nn"     – nearest-neighbour heuristic seeding
 init = "random"
+
+# ── Output ────────────────────────────────────────────────────────────────────
+# Save a fitness-history PNG after the run (<instance_name>_fitness.png).
+# Equivalent CLI flag: --plot
+plot = false

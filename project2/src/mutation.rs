@@ -130,8 +130,6 @@ fn insert_mutation<R: Rng + Sized>(route: &mut Vec<usize>, rng: &mut R) {
 // ── Inter-route mutation ──────────────────────────────────────────────────────
 
 /// Move one random patient from one route to a different random route.
-///
-/// Mirrors Julia's `inter_move` logic.
 fn inter_move<R: Rng + Sized>(genome: &mut Genome, rng: &mut R) {
     // Find two distinct route indices; skip empty source routes.
     let non_empty: Vec<usize> = genome
@@ -159,6 +157,7 @@ fn inter_move<R: Rng + Sized>(genome: &mut Genome, rng: &mut R) {
     let patient_idx = rng.gen_range(0..src_len);
     let patient = genome[src].remove(patient_idx);
 
-    // Append it to the destination route.
-    genome[dst].push(patient);
+    // Insert at random position
+    let insert_at = rng.gen_range(0..=genome[dst].len());
+    genome[dst].insert(insert_at, patient);
 }

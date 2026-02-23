@@ -31,6 +31,8 @@ pub struct Config {
     pub penalty_factor: f64,
     /// Population initialisation method: `"random"` or `"nn"` (nearest-neighbour).
     pub init: String,
+    /// Write a fitness-history PNG plot after the run. Output is named `<instance>_fitness.png`.
+    pub plot: bool,
 }
 
 impl Default for Config {
@@ -46,6 +48,7 @@ impl Default for Config {
             reinsertion_ratio: 0.85,
             penalty_factor: 10.0,
             init: "random".to_string(),
+            plot: false,
         }
     }
 }
@@ -69,6 +72,7 @@ pub struct PartialConfig {
     pub reinsertion_ratio: Option<f64>,
     pub penalty_factor: Option<f64>,
     pub init: Option<String>,
+    pub plot: Option<bool>,
 }
 
 impl PartialConfig {
@@ -84,6 +88,7 @@ impl PartialConfig {
         if let Some(v) = self.reinsertion_ratio  { base.reinsertion_ratio = v; }
         if let Some(v) = self.penalty_factor     { base.penalty_factor = v; }
         if let Some(v) = self.init               { base.init = v; }
+        if let Some(v) = self.plot               { base.plot = v; }
         base
     }
 }

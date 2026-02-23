@@ -10,3 +10,4 @@ rand = "0.8"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+plotters = "0.3"

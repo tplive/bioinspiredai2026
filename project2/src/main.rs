@@ -3,6 +3,7 @@ mod crossover;
 mod fitness;
 mod mutation;
 mod parse;
+mod plot;
 mod population;
 mod types;
 
@@ -80,6 +81,10 @@ struct Cli {
     /// Population initialisation method: "random" or "nn" (nearest-neighbour).
     #[arg(short = 'i', long)]
     init: Option<String>,
+
+    /// Save a fitness-history PNG after the run (output: <instance>_fitness.png).
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    plot: bool,
 }
 
 impl Cli {
@@ -95,6 +100,7 @@ impl Cli {
             reinsertion_ratio: self.reinsertion_ratio,
             penalty_factor:    self.penalty_factor,
             init:              self.init,
+            plot:              if self.plot { Some(true) } else { None },
         }
     }
 }
@@ -185,6 +191,7 @@ fn main() {
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
+    let mut history: Vec<plot::HistoryPoint> = Vec::new();
 
     println!("Running genetic algorithm...");
     println!("{:-<60}", "");
@@ -202,6 +209,12 @@ fn main() {
 
                     // Decode the fitness value back to actual cost.
                     let ind = compute_individual(&bs.solution.genome, &ctx);
+                    history.push(plot::HistoryPoint {
+                        generation: step.iteration,
+                        travel: ind.total_travel,
+                        penalty: ind.total_penalty,
+                        feasible: ind.feasible,
+                    });
                     let pct_diff =
                         (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark
                             * 100.0;
@@ -272,6 +285,30 @@ fn main() {
             } else {
                 println!("  Nurse {:>2}: {:?}", i + 1, route);
             }
+        }
+    }
+
+    // ── Optional fitness-history plot ─────────────────────────────────────────
+    if cfg.plot {
+        use rand::Rng;
+        const KEY_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+        let mut rng = rand::thread_rng();
+        let key: String = (0..4).map(|_| KEY_CHARS[rng.gen_range(0..KEY_CHARS.len())] as char)
+        .collect();
+
+        let output = format!("{}_fitness_{}.png", ctx.instance.name, key);
+        print!("Saving plot → {output} ... ");
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        match plot::save_plot(
+            &history,
+            &cfg,
+            &ctx.instance.name,
+            ctx.instance.benchmark,
+            &output,
+        ) {
+            Ok(()) => println!("done."),
+            Err(e) => eprintln!("plot error: {e}"),
         }
     }
 }
