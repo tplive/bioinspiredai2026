@@ -1,6 +1,7 @@
 mod config;
 mod crossover;
 mod fitness;
+mod local_search;
 mod mutation;
 mod parse;
 mod plot;
@@ -164,7 +165,7 @@ fn main() {
     // ── Set up fitness function and operators ─────────────────────────────────
     let fitness_fn = NurseFitness::new(Arc::clone(&ctx));
     let crossover_op = RouteCrossover::new(Arc::clone(&ctx), cfg.crossover_rate);
-    let mutation_op = NurseMutation::new(cfg.mutation_rate, mutation_op_type);
+    let mutation_op = NurseMutation::new(cfg.mutation_rate, mutation_op_type, Arc::clone(&ctx));
 
     // ── Assemble simulation ───────────────────────────────────────────────────
     let mut sim = simulate(
@@ -286,29 +287,35 @@ fn main() {
                 println!("  Nurse {:>2}: {:?}", i + 1, route);
             }
         }
-    }
 
-    // ── Optional fitness-history plot ─────────────────────────────────────────
-    if cfg.plot {
-        use rand::Rng;
-        const KEY_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-        let mut rng = rand::thread_rng();
-        let key: String = (0..4).map(|_| KEY_CHARS[rng.gen_range(0..KEY_CHARS.len())] as char)
-        .collect();
+        // ── Optional plots ────────────────────────────────────────────────────────
+        if cfg.plot {
+            use rand::Rng;
+            const KEY_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+            let mut rng = rand::thread_rng();
+            let key: String = (0..4).map(|_| KEY_CHARS[rng.gen_range(0..KEY_CHARS.len())] as char)
+                .collect();
 
-        let output = format!("{}_fitness_{}.png", ctx.instance.name, key);
-        print!("Saving plot → {output} ... ");
-        use std::io::Write;
-        let _ = std::io::stdout().flush();
-        match plot::save_plot(
-            &history,
-            &cfg,
-            &ctx.instance.name,
-            ctx.instance.benchmark,
-            &output,
-        ) {
-            Ok(()) => println!("done."),
-            Err(e) => eprintln!("plot error: {e}"),
+            // Route plot
+            if let Err(e) = plot::save_route_plot(&genome, &ctx, &cfg, ind.fitness, &key) {
+                eprintln!("Route plot error: {e}");
+            }
+
+            // Fitness history plot
+            let output = format!("{}_fitness_{}.png", ctx.instance.name, key);
+            print!("Saving plot → {output} ... ");
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
+            match plot::save_plot(
+                &history,
+                &cfg,
+                &ctx.instance.name,
+                ctx.instance.benchmark,
+                &output,
+            ) {
+                Ok(()) => println!("done."),
+                Err(e) => eprintln!("plot error: {e}"),
+            }
         }
     }
 }

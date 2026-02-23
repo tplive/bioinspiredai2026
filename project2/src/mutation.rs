@@ -1,7 +1,10 @@
 use genevo::operator::{GeneticOperator, MutationOp};
 use genevo::random::Rng;
+use std::sync::Arc;
 
 use crate::fitness::Genome;
+use crate::local_search;
+use crate::types::ProblemContext;
 
 // ── Mutation type ─────────────────────────────────────────────────────────────
 
@@ -23,17 +26,20 @@ pub enum MutationType {
 /// (a patient moves from one route to another); otherwise an **intra-route**
 /// mutation (`Swap` or `Insert`) is applied to a randomly chosen route.
 ///
-/// Mirrors the Julia `run_mutation` function.
+/// After mutation, a 2-opt local search pass improves the solution by
+/// eliminating crossing edges and reducing tour length.
+///
 #[derive(Clone, Debug)]
 pub struct NurseMutation {
     /// Probability that any given individual is mutated.
     pub mutation_rate: f64,
     pub mutation_type: MutationType,
+    pub ctx: Arc<ProblemContext>,
 }
 
 impl NurseMutation {
-    pub fn new(mutation_rate: f64, mutation_type: MutationType) -> Self {
-        Self { mutation_rate, mutation_type }
+    pub fn new(mutation_rate: f64, mutation_type: MutationType, ctx: Arc<ProblemContext>) -> Self {
+        Self { mutation_rate, mutation_type, ctx }
     }
 }
 
@@ -59,6 +65,9 @@ impl MutationOp<Genome> for NurseMutation {
             // Intra-route mutation on a randomly chosen non-empty route.
             intra_mutate(&mut genome, &self.mutation_type, rng);
         }
+
+        // Apply 2-opt local search to improve the mutated solution
+        local_search::two_opt(&mut genome, &self.ctx);
 
         genome
     }

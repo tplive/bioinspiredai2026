@@ -133,7 +133,47 @@ fn remove_patients(donor: &[usize], mut individual: Genome) -> (Genome, Vec<usiz
     (individual, orphans)
 }
 
-/// Greedily re-insert orphaned patients into the closest available route.
+/// Calculate the travel cost delta for inserting a patient at a given position in a route.
+///
+/// Returns the difference in travel cost: cost_after - cost_before.
+/// The route includes the depot at the beginning and end (implicit in fitness evaluation).
+/// Position 0 means insert at start; position route.len() means insert at end.
+fn insertion_cost_delta(route: &[usize], position: usize, orphan: usize, mat: &[Vec<f64>]) -> f64 {
+    let n = route.len();
+    let depot = 0;
+
+    // Cost before insertion.
+    let cost_before = if n == 0 {
+        0.0
+    } else {
+        let mut cost = mat[depot][route[0]]; // depot -> first patient
+        for i in 0..n - 1 {
+            cost += mat[route[i]][route[i + 1]]; // patient -> next patient
+        }
+        cost += mat[route[n - 1]][depot]; // last patient -> depot
+        cost
+    };
+
+    // Cost after insertion at `position`.
+    let mut new_route = route.to_vec();
+    new_route.insert(position, orphan);
+    let m = new_route.len();
+
+    let cost_after = if m == 0 {
+        0.0
+    } else {
+        let mut cost = mat[depot][new_route[0]]; // depot -> first patient
+        for i in 0..m - 1 {
+            cost += mat[new_route[i]][new_route[i + 1]]; // patient -> next patient
+        }
+        cost += mat[new_route[m - 1]][depot]; // last patient -> depot
+        cost
+    };
+
+    cost_after - cost_before
+}
+
+/// Greedily re-insert orphaned patients into the best available position across routes.
 ///
 /// For each orphan:
 /// - Candidate routes are those where adding the orphan's demand does not
@@ -143,6 +183,8 @@ fn remove_patients(donor: &[usize], mut individual: Genome) -> (Genome, Vec<usiz
 /// - Routes that already contain patients from the same "region" (proximity
 ///   to the orphan) get a small distance bonus (`× 0.5`) – an approximation
 ///   of the Julia cluster-priority logic without requiring K-means clusters.
+/// - Once the best route is selected, try all insertion positions (O(|route|))
+///   and choose the position that minimizes the travel cost increase.
 /// - If no capacity-respecting route is found, append to a random route.
 fn insert_orphans<R: Rng + Sized>(
     mut routes: Genome,
@@ -196,7 +238,22 @@ fn insert_orphans<R: Rng + Sized>(
         }
 
         match best_route_idx {
-            Some(ri) => routes[ri].push(orphan),
+            Some(ri) => {
+                // Found a capacity-respecting route. Try all insertion positions.
+                let route = &routes[ri];
+                let mut best_position = route.len(); // default: append at end
+                let mut best_cost_delta = f64::INFINITY;
+
+                for pos in 0..=route.len() {
+                    let cost_delta = insertion_cost_delta(route, pos, orphan, mat);
+                    if cost_delta < best_cost_delta {
+                        best_cost_delta = cost_delta;
+                        best_position = pos;
+                    }
+                }
+
+                routes[ri].insert(best_position, orphan);
+            }
             None => {
                 // No capacity-respecting route found – append to a random route.
                 let ri = rng.gen_range(0..routes.len());
