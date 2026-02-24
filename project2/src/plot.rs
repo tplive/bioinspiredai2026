@@ -1,6 +1,7 @@
 use plotters::prelude::*;
-
 use crate::config::Config;
+use crate::fitness::Genome;
+use crate::types::ProblemContext;
 
 // ── Public data type ──────────────────────────────────────────────────────────
 
@@ -225,4 +226,216 @@ fn draw_rows(
         area.draw(&Text::new(value.as_str(), (132, y), val_font.clone()))?;
     }
     Ok(())
+}
+
+/// Draw the best solution's routes onto a PNG file.
+/// Each nurse route gets a distinct colour; the depot is a black square.
+pub fn save_route_plot(
+    genome: &Genome,
+    context: &ProblemContext,
+    cfg: &Config,
+    best_cost: f64,
+    key: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = format!("{}_routes_{}.png", context.instance.name, key);
+
+    // ── Canvas ────────────────────────────────────────────────────────────────
+    let root = BitMapBackend::new(&output, (1200, 900)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let (main_area, legend_area) = root.split_horizontally(860);
+
+    // ── Coordinate bounds ─────────────────────────────────────────────────────
+    let all_x = std::iter::once(context.instance.depot_x)
+        .chain(context.patients.iter().skip(1).map(|p| p.x));
+    let all_y = std::iter::once(context.instance.depot_y)
+        .chain(context.patients.iter().skip(1).map(|p| p.y));
+
+    let x_min = all_x.clone().fold(f64::INFINITY, f64::min);
+    let x_max = all_x.fold(f64::NEG_INFINITY, f64::max);
+    let y_min = all_y.clone().fold(f64::INFINITY, f64::min);
+    let y_max = all_y.fold(f64::NEG_INFINITY, f64::max);
+
+    let x_pad = (x_max - x_min) * 0.07 + 1.0;
+    let y_pad = (y_max - y_min) * 0.07 + 1.0;
+
+    // ── Chart ─────────────────────────────────────────────────────────────────
+    let mut chart = ChartBuilder::on(&main_area)
+        .caption(
+            format!("Route map – {} (cost {:.2})", context.instance.name, best_cost),
+            ("sans-serif", 22).into_font(),
+        )
+        .margin(20)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(
+            (x_min - x_pad)..(x_max + x_pad),
+            (y_min - y_pad)..(y_max + y_pad),
+        )?;
+
+    chart
+        .configure_mesh()
+        .x_desc("X coordinate")
+        .y_desc("Y coordinate")
+        .draw()?;
+
+    // ── Colour palette (HSL rainbow, one hue per nurse) ───────────────────────
+    let n_nurses = genome.len();
+    let colour_for = |i: usize| -> RGBColor {
+        let hue = (i as f64 / n_nurses as f64) * 360.0;
+        hsl_to_rgb(hue, 0.75, 0.45)
+    };
+
+    let depot_x = context.instance.depot_x;
+    let depot_y = context.instance.depot_y;
+
+    // ── Draw routes ───────────────────────────────────────────────────────────
+    for (nurse_idx, route) in genome.iter().enumerate() {
+        if route.is_empty() {
+            continue;
+        }
+        let colour = colour_for(nurse_idx);
+
+        // Build full path: depot → patients → depot
+        let mut path: Vec<(f64, f64)> = Vec::with_capacity(route.len() + 2);
+        path.push((depot_x, depot_y));
+        for &pid in route {
+            if pid < context.patients.len() {
+                let p = &context.patients[pid];
+                path.push((p.x, p.y));
+            }
+        }
+        path.push((depot_x, depot_y));
+
+        // Route line
+        chart.draw_series(LineSeries::new(path.clone(), colour.stroke_width(2)))?;
+
+        // Patient dots
+        chart.draw_series(
+            route.iter().filter_map(|&pid| {
+                if pid < context.patients.len() {
+                    Some(Circle::new((context.patients[pid].x, context.patients[pid].y), 4, colour.filled()))
+                } else {
+                    None
+                }
+            }),
+        )?;
+
+        // Patient ID labels
+        chart.draw_series(
+            route.iter().filter_map(|&pid| {
+                if pid < context.patients.len() {
+                    let p = &context.patients[pid];
+                    Some(Text::new(
+                        format!("{}", pid),
+                        (p.x + 0.4, p.y + 0.4),
+                        ("sans-serif", 9).into_font().color(&colour.mix(0.8)),
+                    ))
+                } else {
+                    None
+                }
+            }),
+        )?;
+    }
+
+    // ── Depot marker ──────────────────────────────────────────────────────────
+    chart.draw_series(std::iter::once(
+        Rectangle::new(
+            [
+                (depot_x - 0.8, depot_y - 0.8),
+                (depot_x + 0.8, depot_y + 0.8),
+            ],
+            BLACK.filled(),
+        ),
+    ))?;
+    chart.draw_series(std::iter::once(Text::new(
+        "Depot",
+        (depot_x + 1.0, depot_y + 1.0),
+        ("sans-serif", 11).into_font().color(&BLACK),
+    )))?;
+
+    // ── Legend panel ──────────────────────────────────────────────────────────
+    legend_area.fill(&RGBColor(245, 245, 245))?;
+
+    let small_font = ("sans-serif", 11).into_font();
+
+    let mut y = 30i32;
+    let lx = 20i32;
+
+    legend_area.draw(&Text::new(
+        "Hyperparameters",
+        (lx, y),
+        ("sans-serif", 15).into_font().color(&BLACK),
+    ))?;
+    y += 24;
+
+    let params = vec![
+        format!("Population:    {}", cfg.pop_size),
+        format!("Generations:   {}", cfg.generations),
+        format!("Crossover:     {:.2}", cfg.crossover_rate),
+        format!("Mutation:      {:.2}", cfg.mutation_rate),
+        format!("Selection:     {:.2}", cfg.selection_ratio),
+        format!("Reinsertion:   {:.2}", cfg.reinsertion_ratio),
+        format!("Penalty:       {:.1}", cfg.penalty_factor),
+        format!("Nurses:        {}", context.instance.num_nurses),
+        format!("Patients:      {}", context.patients.len() - 1),
+    ];
+    for line in &params {
+        legend_area.draw(&Text::new(line.as_str(), (lx, y), small_font.clone()))?;
+        y += 18;
+    }
+
+    y += 16;
+    legend_area.draw(&Text::new(
+        "Route colours",
+        (lx, y),
+        ("sans-serif", 14).into_font().color(&BLACK),
+    ))?;
+    y += 22;
+
+    for (i, route) in genome.iter().enumerate() {
+        if route.is_empty() {
+            continue;
+        }
+        if y > 860 {
+            break; // avoid overflow for large instances
+        }
+        let c = colour_for(i);
+        // Colour swatch
+        legend_area.draw(&Rectangle::new(
+            [(lx, y - 10), (lx + 18, y + 2)],
+            ShapeStyle { color: c.to_rgba(), filled: true, stroke_width: 0 },
+        ))?;
+        legend_area.draw(&Text::new(
+            format!("Nurse {:>2}  ({} pts)", i + 1, route.len()),
+            (lx + 24, y - 9),
+            small_font.clone(),
+        ))?;
+        y += 17;
+    }
+
+    root.present()?;
+    println!("Route plot saved → {output}");
+    Ok(())
+}
+
+// ── HSL → RGB helper ──────────────────────────────────────────────────────────
+
+fn hsl_to_rgb(h: f64, s: f64, l: f64) -> RGBColor {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = l - c / 2.0;
+    let (r1, g1, b1) = match h as u32 {
+        0..=59   => (c, x, 0.0),
+        60..=119 => (x, c, 0.0),
+        120..=179 => (0.0, c, x),
+        180..=239 => (0.0, x, c),
+        240..=299 => (x, 0.0, c),
+        _        => (c, 0.0, x),
+    };
+    RGBColor(
+        ((r1 + m) * 255.0) as u8,
+        ((g1 + m) * 255.0) as u8,
+        ((b1 + m) * 255.0) as u8,
+    )
 }
