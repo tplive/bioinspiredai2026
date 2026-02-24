@@ -25,7 +25,7 @@ use fitness::{compute_individual, Genome, NurseFitness};
 use mutation::{MutationType, NurseMutation};
 use population::{NearestNeighbourGenomeBuilder, RandomGenomeBuilder};
 
-// ── CLI definition ────────────────────────────────────────────────────────────
+//  CLI definition 
 
 /// Configuration is resolved in this priority order (highest wins):
 ///
@@ -106,10 +106,10 @@ impl Cli {
     }
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
+//  Entry point 
 
 fn main() {
-    // ── Parse CLI and resolve full configuration ───────────────────────────────
+    //  Parse CLI and resolve full configuration 
     let cli = Cli::parse();
 
     // Layer 1 → 2: start from defaults, overlay config file if given.
@@ -129,7 +129,7 @@ fn main() {
         _ => MutationType::Swap,
     };
 
-    // ── Load problem instance ─────────────────────────────────────────────────
+    // Load problem instance
     println!("Loading instance: {}", cfg.file);
     let ctx = Arc::new(parse::load_problem(&cfg.file, cfg.penalty_factor));
 
@@ -150,7 +150,7 @@ fn main() {
     println!("Init method:      {}", cfg.init);
     println!();
 
-    // ── Build initial population ──────────────────────────────────────────────
+    //  Build initial population 
     let initial_population: Population<Genome> = match cfg.init.as_str() {
         "nn" => build_population()
             .with_genome_builder(NearestNeighbourGenomeBuilder::new(Arc::clone(&ctx)))
@@ -162,12 +162,15 @@ fn main() {
             .uniform_at_random(),
     };
 
-    // ── Set up fitness function and operators ─────────────────────────────────
+    //  Set up fitness function and operators 
     let fitness_fn = NurseFitness::new(Arc::clone(&ctx));
     let crossover_op = RouteCrossover::new(Arc::clone(&ctx), cfg.crossover_rate);
     let mutation_op = NurseMutation::new(cfg.mutation_rate, mutation_op_type, Arc::clone(&ctx));
 
-    // ── Assemble simulation ───────────────────────────────────────────────────
+    // Clone the mutation operator to keep a reference for updating the adaptive rate
+    let mutation_op_ref = mutation_op.clone();
+
+    //  Assemble simulation 
     let mut sim = simulate(
         genetic_algorithm()
             .with_evaluation(fitness_fn.clone())
@@ -188,7 +191,7 @@ fn main() {
     .until(GenerationLimit::new(cfg.generations as u64))
     .build();
 
-    // ── Run the simulation loop ───────────────────────────────────────────────
+    //  Run the simulation loop 
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
@@ -235,6 +238,23 @@ fn main() {
                     let _ = std::io::stdout().flush();
                 }
 
+                // Calculate population diversity and update adaptive mutation rate
+                // Sample: calculate diversity from best solution changes and generation history
+                let current_diversity = if step.iteration > 5 && history.len() > 1 {
+                    // If best solution hasn't improved recently, diversity is likely low
+                    let best_unchanged_generations = step.iteration - best_generation;
+                    if best_unchanged_generations > 50 {
+                        0.1 // low diversity - population stagnating
+                    } else if best_unchanged_generations > 20 {
+                        0.3 // medium-low diversity
+                    } else {
+                        0.5 // medium-high diversity - improvements happening
+                    }
+                } else {
+                    0.5 // early generations, assume medium diversity
+                };
+                mutation::update_mutation_rate(&mutation_op_ref, current_diversity, cfg.mutation_rate);
+
                 let _ = (ep.average_fitness(), step.duration.fmt(), step.processing_time.fmt());
             }
 
@@ -262,7 +282,7 @@ fn main() {
         }
     }
 
-    // ── Print final solution ──────────────────────────────────────────────────
+    //  Print final solution 
     if let Some(genome) = best_genome {
         println!();
         let ind = compute_individual(&genome, &ctx);
@@ -288,7 +308,7 @@ fn main() {
             }
         }
 
-        // ── Optional plots ────────────────────────────────────────────────────────
+        //  Optional plots 
         if cfg.plot {
             use rand::Rng;
             const KEY_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";

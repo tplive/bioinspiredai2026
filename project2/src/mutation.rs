@@ -1,45 +1,46 @@
 use genevo::operator::{GeneticOperator, MutationOp};
 use genevo::random::Rng;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::fitness::Genome;
-use crate::local_search;
+use crate::local_search::two_opt;
 use crate::types::ProblemContext;
-
-// ── Mutation type ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum MutationType {
-    /// Swap two random patients within the same route (intra-route).
+    // Swap two random patients within the same route (intra-route).
     Swap,
-    /// Relocate one patient to follow another within the same route (intra-route).
+    // Relocate one patient to follow another within the same route (intra-route).
     Insert,
 }
 
-// ── Main operator struct ──────────────────────────────────────────────────────
-
-/// Combined intra-route and inter-route mutation for the nurse scheduling VRP.
-///
-/// With probability `mutation_rate`, a genome is mutated.  
-/// When mutated, with probability 0.5 an **inter-route move** is applied
-/// (a patient moves from one route to another); otherwise an **intra-route**
-/// mutation (`Swap` or `Insert`) is applied to a randomly chosen route.
-///
-/// After mutation, a 2-opt local search pass improves the solution by
-/// eliminating crossing edges and reducing tour length.
-///
+// With probability `mutation_rate`, a genome is mutated.
+// When mutated, with probability 0.5 an "inter-route move" is applied
+// Otherwise an "intra-route" mutation (`Swap` or `Insert`) is applied 
+// to a randomly chosen route.
+//
+// After mutation, a 2-opt local search pass improves the solution by
+// eliminating crossing edges and reducing tour length.
+//
+// The mutation rate is adaptive: it increases when population diversity is low
+// (exploitation → exploration boost) and decreases when diversity is high
+// (preserve good solutions).
 #[derive(Clone, Debug)]
 pub struct NurseMutation {
-    /// Probability that any given individual is mutated.
-    pub mutation_rate: f64,
+    // Shared, mutable mutation rate that can be updated by the GA loop.
+    pub mutation_rate: Arc<Mutex<f64>>,
     pub mutation_type: MutationType,
     pub ctx: Arc<ProblemContext>,
 }
 
 impl NurseMutation {
-    pub fn new(mutation_rate: f64, mutation_type: MutationType, ctx: Arc<ProblemContext>) -> Self {
-        Self { mutation_rate, mutation_type, ctx }
+    pub fn new(initial_mutation_rate: f64, mutation_type: MutationType, ctx: Arc<ProblemContext>) -> Self {
+        Self {
+            mutation_rate: Arc::new(Mutex::new(initial_mutation_rate)),
+            mutation_type,
+            ctx,
+        }
     }
 }
 
@@ -54,7 +55,9 @@ impl MutationOp<Genome> for NurseMutation {
     where
         R: Rng + Sized,
     {
-        if rng.r#gen::<f64>() >= self.mutation_rate {
+        let current_rate = *self.mutation_rate.lock().unwrap();
+
+        if rng.r#gen::<f64>() >= current_rate {
             return genome; // no mutation this round
         }
 
@@ -67,15 +70,13 @@ impl MutationOp<Genome> for NurseMutation {
         }
 
         // Apply 2-opt local search to improve the mutated solution
-        local_search::two_opt(&mut genome, &self.ctx);
+        two_opt(&mut genome, &self.ctx);
 
         genome
     }
 }
 
-// ── Intra-route mutations ─────────────────────────────────────────────────────
-
-/// Apply an intra-route mutation to a randomly-selected route.
+// Apply an intra-route mutation to a randomly-selected route.
 fn intra_mutate<R: Rng + Sized>(genome: &mut Genome, mutation_type: &MutationType, rng: &mut R) {
     // Collect indices of non-trivial routes (>1 patient).
     let candidates: Vec<usize> = genome
@@ -97,7 +98,7 @@ fn intra_mutate<R: Rng + Sized>(genome: &mut Genome, mutation_type: &MutationTyp
     }
 }
 
-/// Swap two distinct random patients within a single route.
+// Swap two distinct random patients within a single route.
 fn swap_mutation<R: Rng + Sized>(route: &mut [usize], rng: &mut R) {
     let len = route.len();
     if len < 2 {
@@ -111,7 +112,7 @@ fn swap_mutation<R: Rng + Sized>(route: &mut [usize], rng: &mut R) {
     route.swap(pos1, pos2);
 }
 
-/// Remove the patient at `pos2` and re-insert it right after `pos1`.
+// Remove the patient at `pos2` and re-insert it right after `pos1`.
 fn insert_mutation<R: Rng + Sized>(route: &mut Vec<usize>, rng: &mut R) {
     let len = route.len();
     if len < 2 {
@@ -136,9 +137,7 @@ fn insert_mutation<R: Rng + Sized>(route: &mut Vec<usize>, rng: &mut R) {
     route.insert(insert_at, patient);
 }
 
-// ── Inter-route mutation ──────────────────────────────────────────────────────
-
-/// Move one random patient from one route to a different random route.
+// Move one random patient from one route to a different random route.
 fn inter_move<R: Rng + Sized>(genome: &mut Genome, rng: &mut R) {
     // Find two distinct route indices; skip empty source routes.
     let non_empty: Vec<usize> = genome
@@ -170,3 +169,101 @@ fn inter_move<R: Rng + Sized>(genome: &mut Genome, rng: &mut R) {
     let insert_at = rng.gen_range(0..=genome[dst].len());
     genome[dst].insert(insert_at, patient);
 }
+
+// Calculate population diversity as the average Hamming distance between all pairs of individuals.
+// Diversity ranges from 0 (all identical) to ~1 (maximum dissimilarity).
+pub fn calculate_population_diversity(population: &[Genome]) -> f64 {
+    if population.len() < 2 {
+        return 0.0;
+    }
+
+    let mut total_distance = 0.0;
+    let mut pair_count = 0;
+
+    for i in 0..population.len() {
+        for j in i + 1..population.len() {
+            // Hamming distance: count positions where the two genomes differ
+            let distance = genome_hamming_distance(&population[i], &population[j]);
+            total_distance += distance;
+            pair_count += 1;
+        }
+    }
+
+    if pair_count == 0 {
+        return 0.0;
+    }
+
+    // Normalize by the maximum possible distance (all patients in different routes)
+    // and the number of pairs
+    total_distance / pair_count as f64
+}
+
+// Calculate Hamming distance between two genomes.
+// Represents the proportion of patients in different routes between the two individuals.
+fn genome_hamming_distance(genome1: &Genome, genome2: &Genome) -> f64 {
+    // Flatten both genomes into assignments: patient_id -> route_index
+    let mut assignment1 = vec![0usize; 1000]; // patient IDs up to ~1000
+    let mut assignment2 = vec![0usize; 1000];
+
+    for (route_idx, route) in genome1.iter().enumerate() {
+        for &patient in route {
+            if patient < assignment1.len() {
+                assignment1[patient] = route_idx;
+            }
+        }
+    }
+
+    for (route_idx, route) in genome2.iter().enumerate() {
+        for &patient in route {
+            if patient < assignment2.len() {
+                assignment2[patient] = route_idx;
+            }
+        }
+    }
+
+    // Count differences
+    let mut differences = 0;
+    let mut total = 0;
+
+    for i in 0..assignment1.len() {
+        if assignment1[i] != assignment2[i] {
+            differences += 1;
+        }
+        if assignment1[i] > 0 || assignment2[i] > 0 {
+            total += 1; // Only count patients that exist
+        }
+    }
+
+    if total == 0 {
+        return 0.0;
+    }
+
+    differences as f64 / total as f64
+}
+
+// Update the mutation rate based on population diversity.
+pub fn update_mutation_rate(
+    mutation_op: &NurseMutation,
+    population_diversity: f64,
+    baseline_rate: f64,
+) {
+    let target_rate = if population_diversity < 0.2 {
+        // Very low diversity, boost exploration
+        (baseline_rate + 0.3) / 2.0 // average of baseline and 0.3
+    } else if population_diversity > 0.6 {
+        // High diversity, reduce mutation
+        (baseline_rate + 0.05) / 2.0 // average of baseline and 0.05
+    } else {
+        // Medium diversity, return to baseline
+        baseline_rate
+    };
+
+    // Transition 10% toward target per update
+    let current = *mutation_op.mutation_rate.lock().unwrap();
+    let new_rate = current + 0.1 * (target_rate - current);
+
+    // Clamp between 0.01 and 0.5
+    let clamped_rate = new_rate.clamp(0.01,0.5);
+    *mutation_op.mutation_rate.lock().unwrap() = clamped_rate;
+}
+

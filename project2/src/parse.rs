@@ -2,12 +2,12 @@ use std::fs;
 use serde_json::Value;
 use crate::types::{Patient, ProblemContext, ProblemInstance};
 
-/// Load and parse a problem instance JSON file.
-///
-/// The JSON format follows this format:
-/// - `nbr_nurses`, `capacity_nurse`, `benchmark`, `depot`, `patients`, `travel_times`
-///
-/// `penalty_factor` scales the time-window and capacity violation penalties.
+// Load and parse a problem instance JSON file.
+//
+// The JSON format follows this format:
+// - `nbr_nurses`, `capacity_nurse`, `benchmark`, `depot`, `patients`, `travel_times`
+//
+// `penalty_factor` scales the time-window and capacity violation penalties.
 pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     
     let json_str = fs::read_to_string(file_path)
@@ -16,7 +16,7 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     let json: Value = serde_json::from_str(&json_str)
         .unwrap_or_else(|e| panic!("Cannot parse '{file_path}' as JSON: {e}"));
 
-    // ── Instance metadata ────────────────────────────────────────────────────
+        // Instance mentadata
     let name = json["instance_name"]
         .as_str()
         .unwrap_or("unknown")
@@ -36,7 +36,7 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     
     let depot_y = json["depot"]["y_coord"].as_f64().expect("depot.y_coord");
 
-    // ── Patients ─────────────────────────────────────────────────────────────
+    // Patients
     let patients_json = json["patients"]
         .as_object()
         .expect("patients must be a JSON object");
@@ -75,7 +75,8 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     
     patients_indexed.extend(patients);
 
-    // ── Travel matrix ─────────────────────────────────────────────────────────
+
+    // Travel Matrix
     let travel_times_raw = json["travel_times"]
         .as_array()
         .expect("travel_times must be a JSON array");
