@@ -262,8 +262,8 @@ pub fn update_mutation_rate(
     let current = *mutation_op.mutation_rate.lock().unwrap();
     let new_rate = current + 0.1 * (target_rate - current);
 
-    // Clamp between 0.01 and 0.5
-    let clamped_rate = new_rate.clamp(0.01,0.5);
+    // Clamp between 0.01 and 0.8
+    let clamped_rate = new_rate.clamp(0.01,0.8);
     *mutation_op.mutation_rate.lock().unwrap() = clamped_rate;
 }
 
