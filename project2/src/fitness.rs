@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use genevo::genetic::FitnessFunction;
+use rayon::prelude::*;
 use crate::types::{IndividualResult, ProblemContext, RouteResult};
 
 /// Genome type alias – outer Vec = one entry per nurse,
@@ -94,13 +95,19 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
     }
 }
 
-/// Evaluate all routes of an individual and aggregate results.
+/// Evaluate all routes of an individual and aggregate results in parallel
 pub fn compute_individual(genome: &Genome, ctx: &ProblemContext) -> IndividualResult {
+
+    // Each route is evaluated independently, so this scales with the number of nurses/cores.
+    let results: Vec<RouteResult> = genome
+        .par_iter()
+        .map(|route| compute_route(route, ctx))
+        .collect();
+
     let mut total_travel = 0.0_f64;
     let mut total_penalty = 0.0_f64;
 
-    for route in genome {
-        let r = compute_route(route, ctx);
+    for r in results {
         total_travel += r.total_travel;
         total_penalty += r.total_penalty;
     }
