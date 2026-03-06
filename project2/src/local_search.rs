@@ -14,7 +14,7 @@ use crate::types::ProblemContext;
 /// crossing edges and reduce tour length, especially after crossover scrambles routes.
 pub fn two_opt(genome: &mut Genome, ctx: &ProblemContext) {
     let mat = &ctx.travel_matrix;
-    const MAX_ITERATIONS_PER_ROUTE: usize = 3;
+    const MAX_ITERATIONS_PER_ROUTE: usize = 10;
 
     for route in genome.iter_mut() {
         if route.len() < 3 {
