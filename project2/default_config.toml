@@ -11,29 +11,41 @@
 file = "train/train_0.json"
 
 # ── GA hyper-parameters ───────────────────────────────────────────────────────
-pop_size         = 300    # number of individuals
+pop_size         = 200    # number of individuals
 generations      = 500    # stopping criterion
 
 selection_type   = "tournament" # or "truncation"
 tournament_size  = 5            # default is 3
-selection_ratio  = 0.60   # fraction of population forwarded to parent pool
+selection_ratio  = 0.80   # fraction of population forwarded to parent pool
 crossover_rate   = 0.65   # probability crossover is applied per parent pair
-mutation_rate    = 0.80   # probability an individual is mutated
+mutation_rate    = 0.60   # probability an individual is mutated
 
 # Intra-route mutation operator: "swap" or "insert"
-mutation_type    = "swap"
+mutation_type    = "insert"
 
 reinsertion_ratio = 0.85  # fraction of offspring in the next generation
 
 # ── Fitness ───────────────────────────────────────────────────────────────────
-penalty_factor   = 5.0   # multiplier per unit of constraint violation
+penalty_factor   = 10.0   # multiplier per unit of constraint violation
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 # "random" – shuffle all patient IDs and split evenly across nurses
 # "nn"     – nearest-neighbour heuristic seeding
-init = "nn"
+# "kmeans" – kmeans 
+init = "kmeans"
 
 # ── Output ────────────────────────────────────────────────────────────────────
-# Save a fitness-history PNG after the run (<instance_name>_fitness.png).
+# Save plots after the run (written inside run_<timestamp>_<instance>_<suffix>/).
 # Equivalent CLI flag: --plot
 plot = false
+
+# Optional deterministic seed (64 hex chars). If omitted, a random seed is
+# generated and saved to config_used.toml in the run folder.
+random_seed = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Replace part of the population if no improvement occurs for N generations.
+stagnation_replace_after = 180
+stagnation_replace_ratio = 0.90
+
+# Number of hill climbing steps to apply when stagnating (100-179 gens without improvement).
+hill_climb_steps = 10

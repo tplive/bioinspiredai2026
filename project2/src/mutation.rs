@@ -3,7 +3,7 @@ use genevo::random::Rng;
 use std::sync::{Arc, Mutex};
 
 use crate::fitness::Genome;
-use crate::local_search::two_opt;
+use crate::local_search::{hill_climb, two_opt};
 use crate::types::ProblemContext;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,20 +26,35 @@ pub enum MutationType {
 // The mutation rate is adaptive: it increases when population diversity is low
 // (exploitation → exploration boost) and decreases when diversity is high
 // (preserve good solutions).
+//
+// When the population stagnates (100-179 generations without improvement),
+// hill climbing is applied instead of normal mutation to help escape local optima.
 #[derive(Clone, Debug)]
 pub struct NurseMutation {
     // Shared, mutable mutation rate that can be updated by the GA loop.
     pub mutation_rate: Arc<Mutex<f64>>,
     pub mutation_type: MutationType,
     pub ctx: Arc<ProblemContext>,
+    // Shared counter for generations without improvement (updated by main loop)
+    pub generations_without_improvement: Arc<Mutex<u64>>,
+    // Number of hill climbing steps to apply when stagnating
+    pub hill_climb_steps: usize,
 }
 
 impl NurseMutation {
-    pub fn new(initial_mutation_rate: f64, mutation_type: MutationType, ctx: Arc<ProblemContext>) -> Self {
+    pub fn new(
+        initial_mutation_rate: f64,
+        mutation_type: MutationType,
+        ctx: Arc<ProblemContext>,
+        generations_without_improvement: Arc<Mutex<u64>>,
+        hill_climb_steps: usize,
+    ) -> Self {
         Self {
             mutation_rate: Arc::new(Mutex::new(initial_mutation_rate)),
             mutation_type,
             ctx,
+            generations_without_improvement,
+            hill_climb_steps,
         }
     }
 }
@@ -55,6 +70,14 @@ impl MutationOp<Genome> for NurseMutation {
     where
         R: Rng + Sized,
     {
+        let gens_without_improvement = *self.generations_without_improvement.lock().unwrap();
+
+        // Apply hill climbing instead of normal mutation when stagnating (100-179 gens without improvement)
+        if gens_without_improvement >= 100 && gens_without_improvement < 180 {
+            return hill_climb(&genome, &self.ctx, self.hill_climb_steps, rng);
+        }
+
+        // Normal mutation with adaptive rate
         let current_rate = *self.mutation_rate.lock().unwrap();
 
         if rng.r#gen::<f64>() >= current_rate {

@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 // ── Full configuration ────────────────────────────────────────────────────────
@@ -9,7 +9,7 @@ use std::path::Path;
 ///   1. Built-in defaults (`Config::default()`)
 ///   2. TOML configuration file (`--config`)
 ///   3. Individual CLI flags
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Config {
     /// Problem instance JSON file path.
     pub file: String,
@@ -29,14 +29,23 @@ pub struct Config {
     pub reinsertion_ratio: f64,
     /// Multiplier applied to each unit of constraint violation.
     pub penalty_factor: f64,
-    /// Population initialisation method: `"random"`, `"nn"` (nearest-neighbour), or `"cw"` (clarke-wright).
+    /// Population initialisation method: `"random"`, `"nn"` (nearest-neighbour), `"cw"` (clarke-wright), or `"kmeans"`.
     pub init: String,
     /// Selection method: `"truncation"` or `"tournament"`.
     pub selection_type: String,
     /// Tournament size for tournament selection (typically 2-5). Ignored if selection_type is "truncation".
     pub tournament_size: usize,
-    /// Write a fitness-history PNG plot after the run. Output is named `<instance>_fitness.png`.
+    /// Write route/fitness plots after the run into the per-run output folder.
     pub plot: bool,
+    /// Seed for deterministic/reproducible runs as 64 hex chars (32 bytes).
+    /// If `None`, a random seed is generated at runtime and persisted in run output.
+    pub random_seed: Option<String>,
+    /// Number of generations without improvement before refreshing population.
+    pub stagnation_replace_after: usize,
+    /// Fraction of population replaced on refresh [0.0–1.0].
+    pub stagnation_replace_ratio: f64,
+    /// Number of hill climbing steps to apply when stagnating (100-179 gens without improvement).
+    pub hill_climb_steps: usize,
 }
 
 impl Default for Config {
@@ -55,6 +64,10 @@ impl Default for Config {
             selection_type: "tournament".to_string(),
             tournament_size: 3,
             plot: false,
+            random_seed: None,
+            stagnation_replace_after: 180,
+            stagnation_replace_ratio: 0.90,
+            hill_climb_steps: 10,
         }
     }
 }
@@ -81,6 +94,10 @@ pub struct PartialConfig {
     pub selection_type: Option<String>,
     pub tournament_size: Option<usize>,
     pub plot: Option<bool>,
+    pub random_seed: Option<String>,
+    pub stagnation_replace_after: Option<usize>,
+    pub hill_climb_steps: Option<usize>,
+    pub stagnation_replace_ratio: Option<f64>,
 }
 
 impl PartialConfig {
@@ -99,6 +116,10 @@ impl PartialConfig {
         if let Some(v) = self.selection_type     { base.selection_type = v; }
         if let Some(v) = self.tournament_size    { base.tournament_size = v; }
         if let Some(v) = self.plot               { base.plot = v; }
+        if let Some(v) = self.random_seed        { base.random_seed = Some(v); }
+        if let Some(v) = self.stagnation_replace_after { base.stagnation_replace_after = v; }
+        if let Some(v) = self.stagnation_replace_ratio { base.stagnation_replace_ratio = v; }
+        if let Some(v) = self.hill_climb_steps   { base.hill_climb_steps = v; }
         base
     }
 }

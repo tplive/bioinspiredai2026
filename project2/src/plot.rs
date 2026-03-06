@@ -264,12 +264,10 @@ pub fn save_route_plot(
     context: &ProblemContext,
     cfg: &Config,
     best_cost: f64,
-    key: &str,
+    output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let output = format!("{}_routes_{}.png", context.instance.name, key);
-
     // ── Canvas ────────────────────────────────────────────────────────────────
-    let root = BitMapBackend::new(&output, (1200, 900)).into_drawing_area();
+    let root = BitMapBackend::new(output_path, (1200, 900)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let (main_area, legend_area) = root.split_horizontally(860);
@@ -444,7 +442,7 @@ pub fn save_route_plot(
     }
 
     root.present()?;
-    println!("Route plot saved → {output}");
+    println!("Route plot saved → {output_path}");
     Ok(())
 }
 

@@ -254,6 +254,111 @@ impl GenomeBuilder<Genome> for NearestNeighbourGenomeBuilder {
     }
 }
 
+// ── K-means genome builder ───────────────────────────────────────────────────
+
+/// Builds genomes by clustering patients with K-means on `(x, y)` coordinates,
+/// then using each cluster as a nurse route.
+///
+/// This tends to create geographically coherent routes while still keeping
+/// diversity through random centroid seeding and intra-route shuffling.
+#[derive(Clone, Debug)]
+pub struct KMeansGenomeBuilder {
+    pub ctx: Arc<ProblemContext>,
+}
+
+impl KMeansGenomeBuilder {
+    pub fn new(ctx: Arc<ProblemContext>) -> Self {
+        Self { ctx }
+    }
+}
+
+impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
+    fn build_genome<R>(&self, _index: usize, rng: &mut R) -> Genome
+    where
+        R: Rng + Sized,
+    {
+        let num_nurses = self.ctx.instance.num_nurses;
+        let num_patients = self.ctx.patients.len() - 1; // subtract dummy depot at [0]
+
+        if num_nurses == 0 {
+            return vec![];
+        }
+        if num_patients == 0 {
+            return vec![vec![]; num_nurses];
+        }
+
+        let k = num_nurses.min(num_patients).max(1);
+        let mut patient_ids: Vec<usize> = (1..=num_patients).collect();
+        fisher_yates_shuffle(&mut patient_ids, rng);
+
+        // Initialize centroids from random patients.
+        let mut centroids: Vec<(f64, f64)> = patient_ids
+            .iter()
+            .take(k)
+            .map(|&pid| {
+                let p = &self.ctx.patients[pid];
+                (p.x, p.y)
+            })
+            .collect();
+
+        let mut assignments = vec![0usize; num_patients];
+
+        // Small fixed number of iterations keeps this fast and stable.
+        for _ in 0..15 {
+            // Assignment step.
+            for (idx, &pid) in patient_ids.iter().enumerate() {
+                let p = &self.ctx.patients[pid];
+                let (best_cluster, _) = centroids
+                    .iter()
+                    .enumerate()
+                    .fold((0usize, f64::INFINITY), |(best_i, best_d), (i, &(cx, cy))| {
+                        let dx = p.x - cx;
+                        let dy = p.y - cy;
+                        let d2 = dx * dx + dy * dy;
+                        if d2 < best_d { (i, d2) } else { (best_i, best_d) }
+                    });
+                assignments[idx] = best_cluster;
+            }
+
+            // Update step.
+            let mut sums = vec![(0.0f64, 0.0f64, 0usize); k];
+            for (idx, &pid) in patient_ids.iter().enumerate() {
+                let c = assignments[idx];
+                let p = &self.ctx.patients[pid];
+                sums[c].0 += p.x;
+                sums[c].1 += p.y;
+                sums[c].2 += 1;
+            }
+
+            for c in 0..k {
+                if sums[c].2 > 0 {
+                    centroids[c] = (
+                        sums[c].0 / sums[c].2 as f64,
+                        sums[c].1 / sums[c].2 as f64,
+                    );
+                } else {
+                    // Re-seed empty cluster from a random patient.
+                    let pid = patient_ids[rng.gen_range(0..patient_ids.len())];
+                    let p = &self.ctx.patients[pid];
+                    centroids[c] = (p.x, p.y);
+                }
+            }
+        }
+
+        let mut routes = vec![Vec::<usize>::new(); k];
+        for (idx, &pid) in patient_ids.iter().enumerate() {
+            routes[assignments[idx]].push(pid);
+        }
+
+        // Add diversity in visit order inside each spatial cluster.
+        for route in &mut routes {
+            fisher_yates_shuffle(route, rng);
+        }
+
+        balance_routes(routes, num_nurses)
+    }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Fisher-Yates in-place shuffle using the provided Rng.

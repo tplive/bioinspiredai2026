@@ -1,8 +1,9 @@
 /// Local search operators: 2-opt and Or-opt for route optimization.
 /// These post-mutation improvements can convert near-feasible solutions to feasible ones
 /// and substantially reduce travel cost throughout a GA run.
-use crate::fitness::Genome;
+use crate::fitness::{compute_individual, Genome};
 use crate::types::ProblemContext;
+use rand::Rng;
 
 /// Perform a 2-opt local search pass on all routes of the genome.
 ///
@@ -77,4 +78,61 @@ fn two_opt_endpoints(route: &[usize], i: usize, j: usize) -> (usize, usize, usiz
     let d = if j + 1 == n { depot } else { route[j + 1] };
 
     (a, b, c, d)
+}
+
+/// Hill climbing local search: iteratively apply swap mutation to random routes,
+/// keeping improvements. This is used after crossover when population is stagnating (100-179 gens
+/// without improvement) to help escape local optima by diversifying offspring.
+///
+/// Algorithm:
+/// - For max_steps iterations:
+///   - Clone current genome
+///   - Pick a random route
+///   - Swap two random patients in that route
+///   - If fitness improves, keep the mutation
+///
+/// This matches the Julia implementation's hill_climb behavior.
+pub fn hill_climb<R: Rng>(genome: &Genome, ctx: &ProblemContext, max_steps: usize, rng: &mut R) -> Genome {
+    let mut best_genome = genome.clone();
+    let mut best_fitness = compute_individual(&best_genome, ctx).fitness;
+
+    for _ in 0..max_steps {
+        let mut neighbor_genome = best_genome.clone();
+
+        // Pick a random non-empty route
+        let non_empty_routes: Vec<usize> = neighbor_genome
+            .iter()
+            .enumerate()
+            .filter(|(_, route)| route.len() >= 2)
+            .map(|(i, _)| i)
+            .collect();
+
+        if non_empty_routes.is_empty() {
+            break; // No routes to mutate
+        }
+
+        let route_idx = non_empty_routes[rng.gen_range(0..non_empty_routes.len())];
+        let route = &mut neighbor_genome[route_idx];
+
+        // Swap two random patients in the route
+        if route.len() >= 2 {
+            let pos1 = rng.gen_range(0..route.len());
+            let mut pos2 = rng.gen_range(0..route.len());
+            while pos1 == pos2 && route.len() > 1 {
+                pos2 = rng.gen_range(0..route.len());
+            }
+            route.swap(pos1, pos2);
+        }
+
+        // Evaluate the neighbor
+        let neighbor_fitness = compute_individual(&neighbor_genome, ctx).fitness;
+
+        // Keep if better (minimization)
+        if neighbor_fitness < best_fitness {
+            best_genome = neighbor_genome;
+            best_fitness = neighbor_fitness;
+        }
+    }
+
+    best_genome
 }
