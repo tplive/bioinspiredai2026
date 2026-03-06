@@ -46,13 +46,14 @@ pub fn save_plot(
     let y_data_min = costs.iter().cloned().fold(f64::INFINITY, f64::min);
     let y_data_max = costs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let y_range_min = y_data_min.min(benchmark);
-    let y_pad = ((y_data_max - y_range_min) * 0.08).max(1.0);
-    let y_min = (y_range_min - y_pad).max(0.0);
-    let y_max = y_data_max + y_pad;
+    
+    // For log scale, ensure minimum is positive (at least 1.0)
+    let y_min = y_range_min.max(1.0) * 0.5; // Start at half the minimum for some padding
+    let y_max = y_data_max * 1.5; // 50% padding at top
 
     let max_gen = cfg.generations as u64;
 
-    // ── Chart ─────────────────────────────────────────────────────────────────
+    // ── Chart (with logarithmic y-axis) ───────────────────────────────────────
     let mut chart = ChartBuilder::on(&chart_area)
         .caption(
             format!("GA Fitness History \u{2013} {instance_name}"),
@@ -61,12 +62,12 @@ pub fn save_plot(
         .margin(16)
         .x_label_area_size(44)
         .y_label_area_size(72)
-        .build_cartesian_2d(0u64..max_gen, y_min..y_max)?;
+        .build_cartesian_2d(0u64..max_gen, (y_min..y_max).log_scale())?;
 
     chart
         .configure_mesh()
         .x_desc("Generation")
-        .y_desc("Best cost")
+        .y_desc("Best cost (log scale)")
         .axis_desc_style(("sans-serif", 14))
         .draw()?;
 
