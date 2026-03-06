@@ -11,12 +11,14 @@
 file = "train/train_0.json"
 
 # ── GA hyper-parameters ───────────────────────────────────────────────────────
-pop_size         = 100    # number of individuals
+pop_size         = 300    # number of individuals
 generations      = 500    # stopping criterion
 
-selection_ratio  = 0.80   # fraction of population forwarded to parent pool
-crossover_rate   = 0.85   # probability crossover is applied per parent pair
-mutation_rate    = 0.10   # probability an individual is mutated
+selection_type   = "tournament" # or "truncation"
+tournament_size  = 5            # default is 3
+selection_ratio  = 0.60   # fraction of population forwarded to parent pool
+crossover_rate   = 0.65   # probability crossover is applied per parent pair
+mutation_rate    = 0.80   # probability an individual is mutated
 
 # Intra-route mutation operator: "swap" or "insert"
 mutation_type    = "swap"
@@ -24,12 +26,12 @@ mutation_type    = "swap"
 reinsertion_ratio = 0.85  # fraction of offspring in the next generation
 
 # ── Fitness ───────────────────────────────────────────────────────────────────
-penalty_factor   = 10.0   # multiplier per unit of constraint violation
+penalty_factor   = 5.0   # multiplier per unit of constraint violation
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 # "random" – shuffle all patient IDs and split evenly across nurses
 # "nn"     – nearest-neighbour heuristic seeding
-init = "random"
+init = "nn"
 
 # ── Output ────────────────────────────────────────────────────────────────────
 # Save a fitness-history PNG after the run (<instance_name>_fitness.png).
