@@ -2,7 +2,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patient {
     pub id: usize,
-    pub demand: i32,
+    pub demand: f64,
     pub start_time: f64,
     pub end_time: f64,
     pub care_time: f64,
@@ -16,7 +16,7 @@ pub struct ProblemInstance {
     pub name: String,
     pub num_nurses: usize,
     /// Maximum demand each nurse can carry per route.
-    pub capacity: i32,
+    pub capacity: f64,
     /// Known best travel time for comparison.
     pub benchmark: f64,
     /// Latest time a nurse must be back at the depot.
@@ -43,7 +43,7 @@ pub struct RouteResult {
     pub total_travel: f64,
     pub total_penalty: f64,
     #[allow(dead_code)]
-    pub total_demand: i32,
+    pub total_demand: f64,
     pub feasible: bool,
 }
 

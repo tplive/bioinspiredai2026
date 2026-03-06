@@ -22,7 +22,7 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
         return RouteResult {
             total_travel: 0.0,
             total_penalty: 0.0,
-            total_demand: 0,
+            total_demand: 0.0,
             feasible: true,
         };
     }
@@ -35,7 +35,7 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
 
     let mut time_of_day = 0.0_f64;
     let mut travel_time = 0.0_f64;
-    let mut total_demand = 0_i32;
+    let mut total_demand = 0.0_f64;
     let mut penalty = 0.0_f64;
     let mut prev_id = 0_usize; // depot is node 0
 
@@ -77,7 +77,7 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
 
     // Penalty for exceeding nurse capacity.
     if total_demand > capacity {
-        let excess = (total_demand - capacity) as f64;
+        let excess = total_demand - capacity;
         penalty += excess * penalty_factor;
     }
 

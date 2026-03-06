@@ -24,7 +24,7 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     
     let num_nurses = json["nbr_nurses"].as_u64().expect("nbr_nurses") as usize;
     
-    let capacity = json["capacity_nurse"].as_i64().expect("capacity_nurse") as i32;
+    let capacity = json["capacity_nurse"].as_f64().expect("capacity_nurse");
     
     let benchmark = json["benchmark"].as_f64().unwrap_or(f64::INFINITY);
     
@@ -47,7 +47,7 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
             let id: usize = k.parse().unwrap_or_else(|_| panic!("patient id '{k}' not numeric"));
             Patient {
                 id,
-                demand: v["demand"].as_i64().expect("demand") as i32,
+                demand: v["demand"].as_f64().expect("demand"),
                 start_time: v["start_time"].as_f64().expect("start_time"),
                 end_time: v["end_time"].as_f64().expect("end_time"),
                 care_time: v["care_time"].as_f64().expect("care_time"),
@@ -65,7 +65,7 @@ pub fn load_problem(file_path: &str, penalty_factor: f64) -> ProblemContext {
     // (inherited from Julia 1-based index)
     let mut patients_indexed = vec![Patient {
         id: 0,
-        demand: 0,
+        demand: 0.0,
         start_time: 0.0,
         end_time: f64::MAX,
         care_time: 0.0,

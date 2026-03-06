@@ -200,7 +200,7 @@ fn insert_orphans<R: Rng + Sized>(
         let orphan_demand = patients[orphan].demand;
 
         // Current demand per route (recalculated from scratch for correctness).
-        let demands: Vec<i32> = routes
+        let demands: Vec<f64> = routes
             .iter()
             .map(|r| r.iter().map(|&pid| patients[pid].demand).sum())
             .collect();
