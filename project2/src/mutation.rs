@@ -199,29 +199,32 @@ pub fn calculate_population_diversity(population: &[Genome]) -> f64 {
 }
 
 // Calculate Hamming distance between two genomes.
-// Represents the proportion of patients in different routes between the two individuals.
+// Includes BOTH route assignments AND sequence positions, so intra-route mutations
+// (swaps, inserts) register as diversity changes.
 fn genome_hamming_distance(genome1: &Genome, genome2: &Genome) -> f64 {
-    // Flatten both genomes into assignments: patient_id -> route_index
-    let mut assignment1 = vec![0usize; 1000]; // patient IDs up to ~1000
-    let mut assignment2 = vec![0usize; 1000];
+    // Track both route and position: patient_id -> (route_index, position_in_route)
+    let mut assignment1: Vec<(usize, usize)> = vec![(0, 0); 1000]; // patient IDs up to ~1000
+    let mut assignment2: Vec<(usize, usize)> = vec![(0, 0); 1000];
 
+    // Build assignment map for genome1
     for (route_idx, route) in genome1.iter().enumerate() {
-        for &patient in route {
+        for (pos_in_route, &patient) in route.iter().enumerate() {
             if patient < assignment1.len() {
-                assignment1[patient] = route_idx;
+                assignment1[patient] = (route_idx, pos_in_route);
             }
         }
     }
 
+    // Build assignment map for genome2
     for (route_idx, route) in genome2.iter().enumerate() {
-        for &patient in route {
+        for (pos_in_route, &patient) in route.iter().enumerate() {
             if patient < assignment2.len() {
-                assignment2[patient] = route_idx;
+                assignment2[patient] = (route_idx, pos_in_route);
             }
         }
     }
 
-    // Count differences
+    // Count differences: patient differs if EITHER route OR position is different
     let mut differences = 0;
     let mut total = 0;
 
@@ -229,8 +232,9 @@ fn genome_hamming_distance(genome1: &Genome, genome2: &Genome) -> f64 {
         if assignment1[i] != assignment2[i] {
             differences += 1;
         }
-        if assignment1[i] > 0 || assignment2[i] > 0 {
-            total += 1; // Only count patients that exist
+        // Only count patients that exist in at least one genome
+        if assignment1[i].0 > 0 || assignment2[i].0 > 0 {
+            total += 1;
         }
     }
 
@@ -248,22 +252,28 @@ pub fn update_mutation_rate(
     baseline_rate: f64,
 ) {
     let target_rate = if population_diversity < 0.2 {
-        // Very low diversity, boost exploration
-        (baseline_rate + 0.3) / 2.0 // average of baseline and 0.3
-    } else if population_diversity > 0.6 {
-        // High diversity, reduce mutation
-        (baseline_rate + 0.05) / 2.0 // average of baseline and 0.05
+        // Very low diversity: INCREASE mutation for more exploration
+        baseline_rate + 0.3
+    } else if population_diversity < 0.4 {
+        // Low diversity: moderately increase mutation
+        baseline_rate + 0.15
+    } else if population_diversity > 0.65 {
+        // High diversity: DECREASE mutation to exploit good solutions
+        (baseline_rate - 0.2).max(0.05) // reduce by 0.2, but keep minimum at 0.05
+    } else if population_diversity > 0.5 {
+        // Medium-high diversity: slightly decrease mutation
+        baseline_rate - 0.08
     } else {
-        // Medium diversity, return to baseline
+        // Medium diversity [0.4, 0.5]: keep baseline
         baseline_rate
     };
 
-    // Transition 10% toward target per update
+    // Transition 15% toward target per update (faster adaptation)
     let current = *mutation_op.mutation_rate.lock().unwrap();
-    let new_rate = current + 0.1 * (target_rate - current);
+    let new_rate = current + 0.15 * (target_rate - current);
 
-    // Clamp between 0.01 and 0.8
-    let clamped_rate = new_rate.clamp(0.01,0.8);
+    // Clamp between 0.01 and 0.9 to allow high exploration when needed
+    let clamped_rate = new_rate.clamp(0.01, 0.9);
     *mutation_op.mutation_rate.lock().unwrap() = clamped_rate;
 }
 
