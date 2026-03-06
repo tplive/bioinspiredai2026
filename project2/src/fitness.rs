@@ -3,6 +3,24 @@ use genevo::genetic::FitnessFunction;
 use rayon::prelude::*;
 use crate::types::{IndividualResult, ProblemContext, RouteResult};
 
+/// Detailed information for a single patient visit within a route.
+#[derive(Debug, Clone)]
+pub struct PatientVisit {
+    pub patient_id: usize,
+    pub arrival_time: f64,
+    pub start_window: f64,
+    pub end_window: f64,
+    pub demand: f64,
+}
+
+/// Detailed information for a complete nurse route.
+#[derive(Debug, Clone)]
+pub struct DetailedRoute {
+    pub route_duration: f64,
+    pub route_demand: f64,
+    pub visits: Vec<PatientVisit>,
+}
+
 /// Genome type alias – outer Vec = one entry per nurse,
 /// inner Vec = ordered list of patient IDs visited by that nurse.
 pub type Genome = Vec<Vec<usize>>;
@@ -92,6 +110,57 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
         total_penalty: penalty,
         total_demand,
         feasible: penalty == 0.0,
+    }
+}
+
+/// Compute detailed route information including per-patient visit times.
+pub fn compute_detailed_route(route: &[usize], ctx: &ProblemContext) -> DetailedRoute {
+    let mut visits = Vec::new();
+    let mut time_of_day = 0.0_f64;
+    let mut travel_time = 0.0_f64;
+    let mut total_demand = 0.0_f64;
+    let mut prev_id = 0_usize; // depot is node 0
+
+    let patients = &ctx.patients;
+    let mat = &ctx.travel_matrix;
+
+    for &id in route {
+        // Travel from previous location to current patient.
+        let t = mat[prev_id][id];
+        time_of_day += t;
+        travel_time += t;
+
+        // Record arrival time and wait if needed
+        let arrival_time = time_of_day;
+        let wait = patients[id].start_time - time_of_day;
+        if wait > 0.0 {
+            time_of_day += wait;
+        }
+
+        // Provide care.
+        time_of_day += patients[id].care_time;
+
+        total_demand += patients[id].demand;
+
+        visits.push(PatientVisit {
+            patient_id: id,
+            arrival_time,
+            start_window: patients[id].start_time,
+            end_window: patients[id].end_time,
+            demand: patients[id].demand,
+        });
+
+        prev_id = id;
+    }
+
+    // Return to depot.
+    let return_travel = mat[prev_id][0];
+    travel_time += return_travel;
+
+    DetailedRoute {
+        route_duration: travel_time,
+        route_demand: total_demand,
+        visits,
     }
 }
 

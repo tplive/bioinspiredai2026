@@ -269,7 +269,7 @@ fn main() {
 
                     let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
                     println!(
-                        "Gen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
+                        "\nGen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
                         step.iteration,
                         ind.fitness,
                         cost_delta,
