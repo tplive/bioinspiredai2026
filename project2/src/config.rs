@@ -29,7 +29,7 @@ pub struct Config {
     pub reinsertion_ratio: f64,
     /// Multiplier applied to each unit of constraint violation.
     pub penalty_factor: f64,
-    /// Population initialisation method: `"random"` or `"nn"` (nearest-neighbour).
+    /// Population initialisation method: `"random"`, `"nn"` (nearest-neighbour), or `"cw"` (clarke-wright).
     pub init: String,
     /// Selection method: `"truncation"` or `"tournament"`.
     pub selection_type: String,

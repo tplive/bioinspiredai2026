@@ -23,7 +23,7 @@ use genevo::{
 use crossover::RouteCrossover;
 use fitness::{compute_individual, Genome, NurseFitness};
 use mutation::{MutationType, NurseMutation};
-use population::{NearestNeighbourGenomeBuilder, RandomGenomeBuilder};
+use population::{ClarkeWrightGenomeBuilder, NearestNeighbourGenomeBuilder, RandomGenomeBuilder};
 
 //  CLI definition 
 
@@ -79,7 +79,7 @@ struct Cli {
     #[arg(long)]
     penalty_factor: Option<f64>,
 
-    /// Population initialisation method: "random" or "nn" (nearest-neighbour).
+    /// Population initialisation method: "random", "nn" (nearest-neighbour), or "cw" (clarke-wright).
     #[arg(short = 'i', long)]
     init: Option<String>,
 
@@ -167,6 +167,10 @@ fn main() {
             .with_genome_builder(NearestNeighbourGenomeBuilder::new(Arc::clone(&ctx)))
             .of_size(cfg.pop_size)
             .uniform_at_random(),
+        "cw" | "clarke-wright" => build_population()
+            .with_genome_builder(ClarkeWrightGenomeBuilder::new(Arc::clone(&ctx)))
+            .of_size(cfg.pop_size)
+            .uniform_at_random(),
         _ => build_population()
             .with_genome_builder(RandomGenomeBuilder::new(Arc::clone(&ctx)))
             .of_size(cfg.pop_size)
@@ -215,6 +219,7 @@ fn main() {
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
     let mut best_feasible = false;
+    let mut best_cost = f64::INFINITY;
     let mut generations_without_improvement = 0u64;
     let mut history: Vec<plot::HistoryPoint> = Vec::new();
     const EARLY_STOP_GENERATIONS: u64 = 200;
@@ -237,6 +242,7 @@ fn main() {
                 mutation::update_mutation_rate(&mutation_op_ref, current_diversity, cfg.mutation_rate);
 
                 if bs.solution.fitness > best_fitness {
+                    let prev_best_cost = best_cost;
                     best_fitness = bs.solution.fitness;
                     best_generation = step.iteration;
                     generations_without_improvement = 0;
@@ -244,6 +250,7 @@ fn main() {
 
                     // Decode the fitness value back to actual cost.
                     let ind = compute_individual(&bs.solution.genome, &ctx);
+                    best_cost = ind.fitness;
                     best_feasible = ind.feasible;
                     history.push(plot::HistoryPoint {
                         generation: step.iteration,
@@ -254,11 +261,18 @@ fn main() {
                     let pct_diff =
                         (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark
                             * 100.0;
+                    let cost_delta = if prev_best_cost.is_finite() {
+                        ind.fitness - prev_best_cost
+                    } else {
+                        0.0
+                    };
 
                     let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
                     println!(
-                        "Gen {:>4} | travel: {:>8.2} | penalty: {:>7.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | {:.2}% from benchmark",
+                        "Gen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
                         step.iteration,
+                        ind.fitness,
+                        cost_delta,
                         ind.total_travel,
                         ind.total_penalty,
                         current_mutation_rate,
