@@ -66,15 +66,21 @@ pub fn save_plot(
     chart
         .configure_mesh()
         .x_desc("Generation")
-        .y_desc("Best cost  (travel + penalty)")
+        .y_desc("Best cost")
         .axis_desc_style(("sans-serif", 14))
         .draw()?;
 
     // Step line – best cost (travel + penalty) evolving over generations.
     chart
-        .draw_series(LineSeries::new(to_step_series(history, max_gen), &BLUE))?
-        .label("Best cost")
+        .draw_series(LineSeries::new(to_cost_series(history, max_gen), &BLUE))?
+        .label("Cost (travel + penalty)")
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+
+    // Step line – travel time only (to show where penalty applied).
+    chart
+        .draw_series(LineSeries::new(to_travel_series(history, max_gen), &GREEN))?
+        .label("Travel time")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
 
     // Benchmark reference line.
     chart
@@ -174,11 +180,11 @@ pub fn save_plot(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Expand sparse improvement history into a step-function series for plotting.
+/// Expand sparse improvement history into a step-function series for plotting total cost.
 ///
 /// Each improvement produces a horizontal segment (hold previous value) and
 /// then a vertical drop to the new value.  The series is extended to `max_gen`.
-fn to_step_series(history: &[HistoryPoint], max_gen: u64) -> Vec<(u64, f64)> {
+fn to_cost_series(history: &[HistoryPoint], max_gen: u64) -> Vec<(u64, f64)> {
     let mut pts: Vec<(u64, f64)> = Vec::with_capacity(history.len() * 2 + 2);
     for (i, p) in history.iter().enumerate() {
         let cost = p.travel + p.penalty;
@@ -192,6 +198,28 @@ fn to_step_series(history: &[HistoryPoint], max_gen: u64) -> Vec<(u64, f64)> {
     // Extend the last value to the end of the run.
     if let Some(&(_, last_cost)) = pts.last() {
         pts.push((max_gen, last_cost));
+    }
+    pts
+}
+
+/// Expand sparse improvement history into a step-function series for travel time only.
+///
+/// Shows just the travel component without penalty, allowing visual identification of
+/// where penalties were applied (gap between travel line and total cost line).
+fn to_travel_series(history: &[HistoryPoint], max_gen: u64) -> Vec<(u64, f64)> {
+    let mut pts: Vec<(u64, f64)> = Vec::with_capacity(history.len() * 2 + 2);
+    for (i, p) in history.iter().enumerate() {
+        let travel = p.travel;
+        if i > 0 {
+            // Horizontal segment at the previous travel time up to this generation.
+            let prev = pts.last().unwrap().1;
+            pts.push((p.generation, prev));
+        }
+        pts.push((p.generation, travel));
+    }
+    // Extend the last value to the end of the run.
+    if let Some(&(_, last_travel)) = pts.last() {
+        pts.push((max_gen, last_travel));
     }
     pts
 }

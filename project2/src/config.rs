@@ -31,6 +31,10 @@ pub struct Config {
     pub penalty_factor: f64,
     /// Population initialisation method: `"random"` or `"nn"` (nearest-neighbour).
     pub init: String,
+    /// Selection method: `"truncation"` or `"tournament"`.
+    pub selection_type: String,
+    /// Tournament size for tournament selection (typically 2-5). Ignored if selection_type is "truncation".
+    pub tournament_size: usize,
     /// Write a fitness-history PNG plot after the run. Output is named `<instance>_fitness.png`.
     pub plot: bool,
 }
@@ -48,6 +52,8 @@ impl Default for Config {
             reinsertion_ratio: 0.85,
             penalty_factor: 10.0,
             init: "random".to_string(),
+            selection_type: "tournament".to_string(),
+            tournament_size: 3,
             plot: false,
         }
     }
@@ -72,6 +78,8 @@ pub struct PartialConfig {
     pub reinsertion_ratio: Option<f64>,
     pub penalty_factor: Option<f64>,
     pub init: Option<String>,
+    pub selection_type: Option<String>,
+    pub tournament_size: Option<usize>,
     pub plot: Option<bool>,
 }
 
@@ -88,6 +96,8 @@ impl PartialConfig {
         if let Some(v) = self.reinsertion_ratio  { base.reinsertion_ratio = v; }
         if let Some(v) = self.penalty_factor     { base.penalty_factor = v; }
         if let Some(v) = self.init               { base.init = v; }
+        if let Some(v) = self.selection_type     { base.selection_type = v; }
+        if let Some(v) = self.tournament_size    { base.tournament_size = v; }
         if let Some(v) = self.plot               { base.plot = v; }
         base
     }

@@ -83,6 +83,14 @@ struct Cli {
     #[arg(short = 'i', long)]
     init: Option<String>,
 
+    /// Selection method: "truncation" or "tournament".
+    #[arg(long)]
+    selection_type: Option<String>,
+
+    /// Tournament size for tournament selection (typically 2-5).
+    #[arg(long)]
+    tournament_size: Option<usize>,
+
     /// Save a fitness-history PNG after the run (output: <instance>_fitness.png).
     #[arg(long, action = clap::ArgAction::SetTrue)]
     plot: bool,
@@ -101,6 +109,8 @@ impl Cli {
             reinsertion_ratio: self.reinsertion_ratio,
             penalty_factor:    self.penalty_factor,
             init:              self.init,
+            selection_type:    self.selection_type,
+            tournament_size:   self.tournament_size,
             plot:              if self.plot { Some(true) } else { None },
         }
     }
@@ -142,6 +152,7 @@ fn main() {
     println!("Population:       {}", cfg.pop_size);
     println!("Generations:      {}", cfg.generations);
     println!("Selection ratio:  {}", cfg.selection_ratio);
+    println!("Tournament size:  {}", cfg.tournament_size);
     println!("Crossover rate:   {}", cfg.crossover_rate);
     println!("Mutation rate:    {}", cfg.mutation_rate);
     println!("Mutation type:    {}", cfg.mutation_type);
@@ -170,13 +181,21 @@ fn main() {
     // Clone the mutation operator to keep a reference for updating the adaptive rate
     let mutation_op_ref = mutation_op.clone();
 
-    //  Assemble simulation 
+//  Assemble simulation using tournament selection
+    // Note: Tournament selection is used exclusively because genevo's API strongly
+    // types the selection operator, making runtime switching between selector types
+    // infeasible without significant code duplication. Tournament selection with
+    // tournament_size=2 approximates truncation selection while providing better
+    // diversity maintenance.
     let mut sim = simulate(
         genetic_algorithm()
             .with_evaluation(fitness_fn.clone())
-            .with_selection(MaximizeSelector::new(
+            .with_selection(TournamentSelector::new(
                 cfg.selection_ratio,
-                2, // parents per group (fixed at 2 for pairwise crossover)
+                2,         // num_individuals_per_parents (pairs for crossover)
+                cfg.tournament_size,
+                1.0,       // probability (1.0 = deterministic, best wins)
+                false,     // remove_selected_individuals (allow reselection)
             ))
             .with_crossover(crossover_op)
             .with_mutation(mutation_op)
@@ -195,7 +214,10 @@ fn main() {
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
+    let mut best_feasible = false;
+    let mut generations_without_improvement = 0u64;
     let mut history: Vec<plot::HistoryPoint> = Vec::new();
+    const EARLY_STOP_GENERATIONS: u64 = 200;
 
     println!("Running genetic algorithm...");
     println!("{:-<60}", "");
@@ -206,13 +228,23 @@ fn main() {
                 let ep = &step.result.evaluated_population;
                 let bs = &step.result.best_solution;
 
+                // Calculate actual population diversity using Hamming distance
+                let population_genomes: Vec<Genome> = ep.individuals()
+                    .iter()
+                    .cloned()
+                    .collect();
+                let current_diversity = mutation::calculate_population_diversity(&population_genomes);
+                mutation::update_mutation_rate(&mutation_op_ref, current_diversity, cfg.mutation_rate);
+
                 if bs.solution.fitness > best_fitness {
                     best_fitness = bs.solution.fitness;
                     best_generation = step.iteration;
+                    generations_without_improvement = 0;
                     best_genome = Some(bs.solution.genome.clone());
 
                     // Decode the fitness value back to actual cost.
                     let ind = compute_individual(&bs.solution.genome, &ctx);
+                    best_feasible = ind.feasible;
                     history.push(plot::HistoryPoint {
                         generation: step.iteration,
                         travel: ind.total_travel,
@@ -223,37 +255,32 @@ fn main() {
                         (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark
                             * 100.0;
 
+                    let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
                     println!(
-                        "Gen {:>4} | travel: {:>8.2} | penalty: {:>7.2} | {}feasible{} | {:.2}% from benchmark",
+                        "Gen {:>4} | travel: {:>8.2} | penalty: {:>7.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | {:.2}% from benchmark",
                         step.iteration,
                         ind.total_travel,
                         ind.total_penalty,
+                        current_mutation_rate,
+                        current_diversity,
                         if ind.feasible { "" } else { "NOT " },
                         if ind.feasible { "" } else { "  " },
                         pct_diff,
                     );
                 } else {
+                    generations_without_improvement += 1;
                     print!(".");
                     use std::io::Write;
                     let _ = std::io::stdout().flush();
-                }
-
-                // Calculate population diversity and update adaptive mutation rate
-                // Sample: calculate diversity from best solution changes and generation history
-                let current_diversity = if step.iteration > 5 && history.len() > 1 {
-                    // If best solution hasn't improved recently, diversity is likely low
-                    let best_unchanged_generations = step.iteration - best_generation;
-                    if best_unchanged_generations > 50 {
-                        0.1 // low diversity - population stagnating
-                    } else if best_unchanged_generations > 20 {
-                        0.3 // medium-low diversity
-                    } else {
-                        0.5 // medium-high diversity - improvements happening
+                    
+                    // Early stop after 200 generations without improvement, but only if best solution is feasible
+                    if best_feasible && generations_without_improvement >= EARLY_STOP_GENERATIONS {
+                        println!();
+                        println!("{:-<60}", "");
+                        println!("Early stopping: No improvement for {} generations (best solution is feasible)", EARLY_STOP_GENERATIONS);
+                        break 'sim;
                     }
-                } else {
-                    0.5 // early generations, assume medium diversity
-                };
-                mutation::update_mutation_rate(&mutation_op_ref, current_diversity, cfg.mutation_rate);
+                }
 
                 let _ = (ep.average_fitness(), step.duration.fmt(), step.processing_time.fmt());
             }
