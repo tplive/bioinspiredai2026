@@ -1,14 +1,14 @@
+use genevo::{operator::prelude::*, population::Population, prelude::*, types::fmt::Display};
 use std::io::Write;
 use std::sync::{Arc, Mutex};
-use genevo::{operator::prelude::*, population::Population, prelude::*, types::fmt::Display};
 
 use crate::config::Config;
 use crate::crossover::RouteCrossover;
 use crate::fitness::{Genome, NurseFitness, compute_individual};
 use crate::mutation::{MutationType, NurseMutation};
+use crate::plot;
 use crate::population::refresh_population;
 use crate::types::ProblemContext;
-use crate::plot;
 
 const EARLY_STOP_GENERATIONS: u64 = 200;
 
