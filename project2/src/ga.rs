@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::config::Config;
 use crate::crossover::RouteCrossover;
-use crate::fitness::{Genome, NurseFitness, compute_individual};
+use crate::fitness::{Genome, RouteFitness, compute_individual};
 use crate::mutation::{MutationType, NurseMutation};
 use crate::plot;
 use crate::population::refresh_population;
@@ -32,7 +32,8 @@ pub fn run_ga(
     let mut best_generation: u64 = 0;
     let mut best_feasible = false;
     let mut best_cost = f64::INFINITY;
-    let mut total_generations_without_improvement = 0;
+    let mut best_feasible_cost = f64::INFINITY;
+    let mut total_generations_without_feasible_improvement = 0;
     let mut generations_without_improvement = 0;
     let generations_without_improvement_shared = Arc::new(Mutex::new(0));
     let mut history: Vec<plot::HistoryPoint> = Vec::new();
@@ -49,7 +50,7 @@ pub fn run_ga(
         let remaining_generations = cfg.generations as u64 - generation_offset;
         let phase_seed = derive_seed(&run_seed, restart_counter);
 
-        let fitness_fn = NurseFitness::new(ctx.clone());
+        let fitness_fn = RouteFitness::new(ctx.clone());
         let crossover_op = RouteCrossover::new(ctx.clone(), cfg.crossover_rate);
         let mutation_op = NurseMutation::new(
             cfg.mutation_rate,
@@ -94,6 +95,17 @@ pub fn run_ga(
                     let bs = &step.result.best_solution;
                     let global_generation = generation_offset + step.iteration;
                     generations_run = global_generation;
+                    let ind = compute_individual(&bs.solution.genome, ctx);
+
+                    if ind.feasible && ind.fitness < best_feasible_cost {
+                        best_feasible_cost = ind.fitness;
+                        best_feasible = true;
+                        total_generations_without_feasible_improvement = 0;
+                        generations_without_improvement = 0;
+                        *generations_without_improvement_shared.lock().unwrap() = 0;
+                    } else {
+                        total_generations_without_feasible_improvement += 1;
+                    }
 
                     // Calculate actual population diversity using Hamming distance
                     let population_genomes: Vec<Genome> =
@@ -110,13 +122,9 @@ pub fn run_ga(
                         let prev_best_cost = best_cost;
                         best_fitness = bs.solution.fitness;
                         best_generation = global_generation;
-                        total_generations_without_improvement = 0;
                         generations_without_improvement = 0;
                         *generations_without_improvement_shared.lock().unwrap() = 0;
                         best_genome = Some(bs.solution.genome.clone());
-
-                        // Decode the fitness value back to actual cost.
-                        let ind = compute_individual(&bs.solution.genome, ctx);
                         best_cost = ind.fitness;
                         best_feasible = ind.feasible;
                         history.push(plot::HistoryPoint {
@@ -149,7 +157,6 @@ pub fn run_ga(
                             pct_diff,
                         );
                     } else {
-                        total_generations_without_improvement += 1;
                         generations_without_improvement += 1;
                         *generations_without_improvement_shared.lock().unwrap() =
                             generations_without_improvement;
@@ -162,19 +169,6 @@ pub fn run_ga(
                         }
                         let _ = std::io::stdout().flush();
 
-                        // Early stop after 200 generations without improvement, but only if best solution is feasible
-                        if best_feasible
-                            && total_generations_without_improvement >= EARLY_STOP_GENERATIONS
-                        {
-                            println!();
-                            println!("{:-<60}", "");
-                            println!(
-                                "Early stopping: No improvement for {} generations (best solution is feasible)",
-                                total_generations_without_improvement
-                            );
-                            should_stop = true;
-                            break 'sim;
-                        }
                     }
 
                     if cfg.stagnation_replace_after > 0
@@ -201,6 +195,20 @@ pub fn run_ga(
                             global_generation, cfg.stagnation_replace_ratio
                         );
                         continue 'run;
+                    }
+
+                    // Early stop after enough generations without improving the best feasible solution.
+                    if best_feasible
+                        && total_generations_without_feasible_improvement >= EARLY_STOP_GENERATIONS
+                    {
+                        println!();
+                        println!("{:-<60}", "");
+                        println!(
+                            "Early stopping: No feasible improvement for {} generations",
+                            total_generations_without_feasible_improvement
+                        );
+                        should_stop = true;
+                        break 'sim;
                     }
 
                     let _ = (

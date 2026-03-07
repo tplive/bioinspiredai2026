@@ -116,6 +116,7 @@ struct Cli {
     /// Number of hill climbing steps when stagnating
     #[arg(long)]
     hill_climb_steps: Option<usize>,
+
 }
 
 impl Cli {
