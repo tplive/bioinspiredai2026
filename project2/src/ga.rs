@@ -10,7 +10,7 @@ use crate::plot;
 use crate::population::refresh_population;
 use crate::types::ProblemContext;
 
-const EARLY_STOP_GENERATIONS: u64 = 200;
+const EARLY_STOP_GENERATIONS: u64 = 1000;
 
 /// Results from running the genetic algorithm
 pub struct GaResults {
@@ -211,22 +211,15 @@ pub fn run_ga(
                 }
 
                 Ok(SimResult::Final(step, processing_time, duration, stop_reason)) => {
-                    println!();
-                    println!("{:-<60}", "");
-                    println!("Simulation finished: {stop_reason}");
-                    println!(
-                        "Total time: {}  |  Processing time: {}",
-                        duration.fmt(),
-                        processing_time.fmt()
-                    );
-                    println!("Best fitness found in generation {best_generation}");
-
                     generation_offset += step.iteration;
                     generations_run = generation_offset;
 
                     if best_genome.is_none() {
                         best_genome = Some(step.result.best_solution.solution.genome.clone());
                     }
+                    
+                    // Only print phase stop reason for debugging, not as final status
+                    let _ = (stop_reason, processing_time, duration);
                     break 'sim;
                 }
 
@@ -241,6 +234,14 @@ pub fn run_ga(
         if should_stop {
             break 'run;
         }
+    }
+
+    // Print completion status
+    if !should_stop && generation_offset >= cfg.generations as u64 {
+        println!();
+        println!("{:-<60}", "");
+        println!("Simulation completed: reached maximum generations limit ({})", cfg.generations);
+        println!("Best fitness found in generation {best_generation}");
     }
 
     GaResults {
