@@ -16,6 +16,7 @@ const EARLY_STOP_GENERATIONS: u64 = 200;
 pub struct GaResults {
     pub best_genome: Option<Genome>,
     pub history: Vec<plot::HistoryPoint>,
+    pub generations_run: u64,
 }
 
 /// Run the genetic algorithm with the given configuration and initial population
@@ -31,9 +32,11 @@ pub fn run_ga(
     let mut best_generation: u64 = 0;
     let mut best_feasible = false;
     let mut best_cost = f64::INFINITY;
-    let mut generations_without_improvement = 0u64;
-    let generations_without_improvement_shared = Arc::new(Mutex::new(0u64));
+    let mut total_generations_without_improvement = 0;
+    let mut generations_without_improvement = 0;
+    let generations_without_improvement_shared = Arc::new(Mutex::new(0));
     let mut history: Vec<plot::HistoryPoint> = Vec::new();
+    let mut generations_run: u64 = 0;
     let mut current_population = Some(initial_population);
     let mut generation_offset: u64 = 0;
     let mut restart_counter: u64 = 0;
@@ -90,6 +93,7 @@ pub fn run_ga(
                     let ep = &step.result.evaluated_population;
                     let bs = &step.result.best_solution;
                     let global_generation = generation_offset + step.iteration;
+                    generations_run = global_generation;
 
                     // Calculate actual population diversity using Hamming distance
                     let population_genomes: Vec<Genome> =
@@ -106,6 +110,7 @@ pub fn run_ga(
                         let prev_best_cost = best_cost;
                         best_fitness = bs.solution.fitness;
                         best_generation = global_generation;
+                        total_generations_without_improvement = 0;
                         generations_without_improvement = 0;
                         *generations_without_improvement_shared.lock().unwrap() = 0;
                         best_genome = Some(bs.solution.genome.clone());
@@ -144,13 +149,14 @@ pub fn run_ga(
                             pct_diff,
                         );
                     } else {
+                        total_generations_without_improvement += 1;
                         generations_without_improvement += 1;
                         *generations_without_improvement_shared.lock().unwrap() =
                             generations_without_improvement;
 
                         // Print visual indicator for hill climbing activation
                         if (100..180).contains(&generations_without_improvement) {
-                            print!("0"); // Julia uses '0' to indicate hill climbing
+                            print!("h"); // Say "h" for "hill" when doing hill climbing
                         } else {
                             print!(".");
                         }
@@ -158,13 +164,13 @@ pub fn run_ga(
 
                         // Early stop after 200 generations without improvement, but only if best solution is feasible
                         if best_feasible
-                            && generations_without_improvement >= EARLY_STOP_GENERATIONS
+                            && total_generations_without_improvement >= EARLY_STOP_GENERATIONS
                         {
                             println!();
                             println!("{:-<60}", "");
                             println!(
                                 "Early stopping: No improvement for {} generations (best solution is feasible)",
-                                EARLY_STOP_GENERATIONS
+                                total_generations_without_improvement
                             );
                             should_stop = true;
                             break 'sim;
@@ -216,6 +222,7 @@ pub fn run_ga(
                     println!("Best fitness found in generation {best_generation}");
 
                     generation_offset += step.iteration;
+                    generations_run = generation_offset;
 
                     if best_genome.is_none() {
                         best_genome = Some(step.result.best_solution.solution.genome.clone());
@@ -239,6 +246,7 @@ pub fn run_ga(
     GaResults {
         best_genome,
         history,
+        generations_run,
     }
 }
 

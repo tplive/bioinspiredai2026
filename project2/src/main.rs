@@ -262,6 +262,7 @@ fn main() {
     let best_genome = ga_results.best_genome;
 
     let history = ga_results.history;
+    let generations_run = ga_results.generations_run;
 
     //  Print final solution
     if let Some(genome) = best_genome.as_ref() {
@@ -360,6 +361,7 @@ fn main() {
             match plot::save_plot(
                 &history,
                 &cfg,
+                generations_run,
                 &ctx.instance.name,
                 ctx.instance.benchmark,
                 &output.display().to_string(),

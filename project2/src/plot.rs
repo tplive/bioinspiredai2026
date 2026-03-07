@@ -24,6 +24,7 @@ pub struct HistoryPoint {
 pub fn save_plot(
     history: &[HistoryPoint],
     cfg: &Config,
+    generations_run: u64,
     instance_name: &str,
     benchmark: f64,
     output_path: &str,
@@ -51,7 +52,7 @@ pub fn save_plot(
     let y_min = y_range_min.max(1.0) * 0.5; // Start at half the minimum for some padding
     let y_max = y_data_max * 1.5; // 50% padding at top
 
-    let max_gen = cfg.generations as u64;
+    let max_gen = generations_run.max(1);
 
     // ── Chart (with logarithmic y-axis) ───────────────────────────────────────
     let mut chart = ChartBuilder::on(&chart_area)
@@ -273,15 +274,17 @@ pub fn save_route_plot(
     let (main_area, legend_area) = root.split_horizontally(860);
 
     // ── Coordinate bounds ─────────────────────────────────────────────────────
-    let all_x = std::iter::once(context.instance.depot_x)
-        .chain(context.patients.iter().skip(1).map(|p| p.x));
-    let all_y = std::iter::once(context.instance.depot_y)
-        .chain(context.patients.iter().skip(1).map(|p| p.y));
+    let all_x: Vec<f64> = std::iter::once(context.instance.depot_x)
+        .chain(context.patients.iter().skip(1).map(|p| p.x))
+        .collect();
+    let all_y: Vec<f64> = std::iter::once(context.instance.depot_y)
+        .chain(context.patients.iter().skip(1).map(|p| p.y))
+        .collect();
 
-    let x_min = all_x.clone().fold(f64::INFINITY, f64::min);
-    let x_max = all_x.fold(f64::NEG_INFINITY, f64::max);
-    let y_min = all_y.clone().fold(f64::INFINITY, f64::min);
-    let y_max = all_y.fold(f64::NEG_INFINITY, f64::max);
+    let x_min = all_x.iter().copied().fold(f64::INFINITY, f64::min);
+    let x_max = all_x.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let y_min = all_y.iter().copied().fold(f64::INFINITY, f64::min);
+    let y_max = all_y.iter().copied().fold(f64::NEG_INFINITY, f64::max);
 
     let x_pad = (x_max - x_min) * 0.07 + 1.0;
     let y_pad = (y_max - y_min) * 0.07 + 1.0;
@@ -335,7 +338,7 @@ pub fn save_route_plot(
         path.push((depot_x, depot_y));
 
         // Route line
-        chart.draw_series(LineSeries::new(path.clone(), colour.stroke_width(2)))?;
+        chart.draw_series(LineSeries::new(path, colour.stroke_width(2)))?;
 
         // Patient dots
         chart.draw_series(
