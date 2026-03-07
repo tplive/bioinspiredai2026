@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use genevo::genetic::FitnessFunction;
-use rayon::prelude::*;
 use crate::types::{IndividualResult, ProblemContext, RouteResult};
 
 /// Detailed information for a single patient visit within a route.
@@ -58,6 +58,9 @@ pub fn compute_route(route: &[usize], ctx: &ProblemContext) -> RouteResult {
     let mut prev_id = 0_usize; // depot is node 0
 
     for &id in route {
+        // Cache patient data to avoid repeated indexing
+        let patient = &patients[id];
+        
         // Travel from previous location to current patient.
         let t = mat[prev_id][id];
         time_of_day += t;
@@ -164,12 +167,10 @@ pub fn compute_detailed_route(route: &[usize], ctx: &ProblemContext) -> Detailed
     }
 }
 
-/// Evaluate all routes of an individual and aggregate results in parallel
+/// Evaluate all routes of an individual and aggregate results.
 pub fn compute_individual(genome: &Genome, ctx: &ProblemContext) -> IndividualResult {
-
-    // Each route is evaluated independently, so this scales with the number of nurses/cores.
     let results: Vec<RouteResult> = genome
-        .par_iter()
+        .iter()
         .map(|route| compute_route(route, ctx))
         .collect();
 
@@ -195,25 +196,47 @@ pub fn compute_individual(genome: &Genome, ctx: &ProblemContext) -> IndividualRe
 ///
 /// genevo **maximises** fitness, so we return `-(travel + penalty) * SCALE`
 /// (a large negative number for costly solutions, closer to 0 for cheap ones).
+///
+/// Includes a fitness cache to avoid recomputing fitness for previously evaluated genomes.
 #[derive(Clone, Debug)]
-pub struct NurseFitness {
+pub struct RouteFitness {
     pub ctx: Arc<ProblemContext>,
+    cache: Arc<Mutex<HashMap<Genome, i64>>>,
 }
 
-impl NurseFitness {
+impl RouteFitness {
     pub fn new(ctx: Arc<ProblemContext>) -> Self {
-        Self { ctx }
+        Self {
+            ctx,
+            cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
 /// Scale factor so fractional time differences are preserved in the `i64` fitness.
 const FITNESS_SCALE: f64 = 1_000.0;
 
-impl FitnessFunction<Genome, i64> for NurseFitness {
+impl FitnessFunction<Genome, i64> for RouteFitness {
     fn fitness_of(&self, genome: &Genome) -> i64 {
+        // Check cache first
+        {
+            let cache = self.cache.lock().unwrap();
+            if let Some(&fitness) = cache.get(genome) {
+                return fitness;
+            }
+        }
+
+        // Not in cache - compute it
         let ind = compute_individual(genome, &self.ctx);
-        // Negate so that lower cost ↔ higher genevo fitness.
-        -(ind.fitness * FITNESS_SCALE) as i64
+        let fitness = -(ind.fitness * FITNESS_SCALE) as i64;
+
+        // Store in cache
+        {
+            let mut cache = self.cache.lock().unwrap();
+            cache.insert(genome.clone(), fitness);
+        }
+
+        fitness
     }
 
     fn average(&self, values: &[i64]) -> i64 {
@@ -230,5 +253,120 @@ impl FitnessFunction<Genome, i64> for NurseFitness {
 
     fn lowest_possible_fitness(&self) -> i64 {
         i64::MIN / 2
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Patient, ProblemInstance};
+    use std::time::Instant;
+
+    fn create_test_context() -> Arc<ProblemContext> {
+        // Create a simple test problem with 10 patients
+        let depot = Patient {
+            id: 0,
+            demand: 0.0,
+            start_time: 0.0,
+            end_time: 500.0,
+            care_time: 0.0,
+            x: 0.0,
+            y: 0.0,
+        };
+
+        let mut patients = vec![depot];
+        for i in 1..=10 {
+            patients.push(Patient {
+                id: i,
+                demand: 5.0,
+                start_time: 0.0,
+                end_time: 480.0,
+                care_time: 10.0,
+                x: (i as f64) * 10.0,
+                y: (i as f64) * 5.0,
+            });
+        }
+
+        // Simple Euclidean distance matrix
+        let n = patients.len();
+        let mut travel_matrix = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let dx = patients[i].x - patients[j].x;
+                let dy = patients[i].y - patients[j].y;
+                travel_matrix[i][j] = (dx * dx + dy * dy).sqrt();
+            }
+        }
+
+        Arc::new(ProblemContext {
+            instance: ProblemInstance {
+                name: "test".to_string(),
+                num_nurses: 3,
+                capacity: 30.0,
+                benchmark: 100.0,
+                depot_return_time: 480.0,
+                depot_x: 0.0,
+                depot_y: 0.0,
+            },
+            patients,
+            travel_matrix,
+            penalty_factor: 10.0,
+        })
+    }
+
+    #[test]
+    fn test_fitness_computation_vs_cache_lookup() {
+        let ctx = create_test_context();
+        let test_genome: Genome = vec![
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9, 10],
+        ];
+
+        const ITERATIONS: usize = 100_000;
+
+        // Test 1: Direct fitness computation (bypassing cache)
+        println!("\n=== Fitness Computation vs Cache Lookup ===");
+        let start = Instant::now();
+        for _ in 0..ITERATIONS {
+            let ind = compute_individual(&test_genome, &ctx);
+            let _fitness = -(ind.fitness * FITNESS_SCALE) as i64;
+        }
+        let direct_duration = start.elapsed();
+        println!(
+            "Direct computation ({} iterations): {:?}",
+            ITERATIONS, direct_duration
+        );
+
+        // Test 2: Cache lookup after initial population
+        let fitness_fn = RouteFitness::new(ctx.clone());
+        
+        // Prime the cache with one evaluation
+        let _first = fitness_fn.fitness_of(&test_genome);
+        
+        let start = Instant::now();
+        for _ in 0..ITERATIONS {
+            let _fitness = fitness_fn.fitness_of(&test_genome);
+        }
+        let cache_duration = start.elapsed();
+        println!(
+            "Cache lookup ({} iterations):      {:?}",
+            ITERATIONS, cache_duration
+        );
+
+        // Calculate speedup
+        let speedup = direct_duration.as_secs_f64() / cache_duration.as_secs_f64();
+        println!("\nSpeedup factor: {:.2}x", speedup);
+        
+        if speedup > 1.0 {
+            println!("Cache is {:.2}% faster", (1.0 - 1.0 / speedup) * 100.0);
+        } else {
+            println!("Cache overhead: {:.2}%", (speedup - 1.0) * 100.0);
+        }
+
+        println!("\nNote: For small problems, cache overhead (mutex + hash) may exceed");
+        println!("savings. Cache benefits increase with larger problems and repeated evaluations.");
+
+        // Test passes - we're just measuring performance characteristics
     }
 }
