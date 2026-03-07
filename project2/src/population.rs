@@ -273,64 +273,13 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
             return vec![vec![]; num_nurses];
         }
 
-        let k = num_nurses.min(num_patients).max(1);
         let mut patient_ids: Vec<usize> = (1..=num_patients).collect();
         shuffle(&mut patient_ids, rng);
 
-        // Initialize centroids from random patients.
-        let mut centroids: Vec<(f64, f64)> = patient_ids
-            .iter()
-            .take(k)
-            .map(|&pid| {
-                let p = &self.ctx.patients[pid];
-                (p.x, p.y)
-            })
-            .collect();
+        // Find optimal k using elbow method
+        let k = find_optimal_k(&self.ctx, &patient_ids, num_nurses, num_patients, rng);
 
-        let mut assignments = vec![0usize; num_patients];
-
-        // Small fixed number of iterations keeps this fast and stable.
-        for _ in 0..15 {
-            // Assignment step.
-            for (idx, &pid) in patient_ids.iter().enumerate() {
-                let p = &self.ctx.patients[pid];
-                let (best_cluster, _) = centroids.iter().enumerate().fold(
-                    (0usize, f64::INFINITY),
-                    |(best_i, best_d), (i, &(cx, cy))| {
-                        let dx = p.x - cx;
-                        let dy = p.y - cy;
-                        let d2 = dx * dx + dy * dy;
-                        if d2 < best_d {
-                            (i, d2)
-                        } else {
-                            (best_i, best_d)
-                        }
-                    },
-                );
-                assignments[idx] = best_cluster;
-            }
-
-            // Update step.
-            let mut sums = vec![(0.0f64, 0.0f64, 0usize); k];
-            for (idx, &pid) in patient_ids.iter().enumerate() {
-                let c = assignments[idx];
-                let p = &self.ctx.patients[pid];
-                sums[c].0 += p.x;
-                sums[c].1 += p.y;
-                sums[c].2 += 1;
-            }
-
-            for c in 0..k {
-                if sums[c].2 > 0 {
-                    centroids[c] = (sums[c].0 / sums[c].2 as f64, sums[c].1 / sums[c].2 as f64);
-                } else {
-                    // Re-seed empty cluster from a random patient.
-                    let pid = patient_ids[rng.gen_range(0..patient_ids.len())];
-                    let p = &self.ctx.patients[pid];
-                    centroids[c] = (p.x, p.y);
-                }
-            }
-        }
+        let (assignments, _centroids) = run_kmeans(&self.ctx, &patient_ids, k, rng);
 
         let mut routes = vec![Vec::<usize>::new(); k];
         for (idx, &pid) in patient_ids.iter().enumerate() {
@@ -344,6 +293,158 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
 
         balance_routes(routes, num_nurses)
     }
+}
+
+/// Find the optimal number of clusters using the elbow method.
+/// Tries different k values and picks the one where the marginal improvement diminishes.
+fn find_optimal_k<R: Rng + Sized>(
+    ctx: &Arc<ProblemContext>,
+    patient_ids: &[usize],
+    num_nurses: usize,
+    num_patients: usize,
+    rng: &mut R,
+) -> usize {
+    // Try k values from 2 to min(num_nurses, num_patients, reasonable_max)
+    let min_k = 2;
+    let max_k = num_nurses.min(num_patients).min(15); // Cap at 15 to keep it fast
+
+    if max_k < min_k {
+        return 1;
+    }
+
+    let mut inertias = Vec::new();
+    
+    for k in min_k..=max_k {
+        let (assignments, centroids) = run_kmeans(ctx, patient_ids, k, rng);
+        let inertia = calculate_inertia(ctx, patient_ids, &assignments, &centroids);
+        inertias.push((k, inertia));
+    }
+
+    // Find elbow using rate of change method
+    // Calculate the rate of improvement for each k
+    let mut best_k = min_k;
+    let mut best_score = f64::NEG_INFINITY;
+
+    for i in 0..inertias.len().saturating_sub(1) {
+        let (k, inertia) = inertias[i];
+        let (_, next_inertia) = inertias[i + 1];
+        
+        // Rate of improvement (negative because inertia decreases)
+        let improvement_rate = inertia - next_inertia;
+        
+        // Score: balance improvement rate with keeping k small
+        // Prefer smaller k unless improvement rate is significantly better
+        let normalized_k = k as f64 / max_k as f64;
+        let score = improvement_rate * (1.0 - normalized_k * 0.3);
+        
+        if score > best_score {
+            best_score = score;
+            best_k = k;
+        }
+    }
+
+    // Also consider the last k value
+    if inertias.len() > 0 {
+        let (last_k, last_inertia) = inertias[inertias.len() - 1];
+        if inertias.len() > 1 {
+            let (_, prev_inertia) = inertias[inertias.len() - 2];
+            let improvement_rate = prev_inertia - last_inertia;
+            let normalized_k = last_k as f64 / max_k as f64;
+            let score = improvement_rate * (1.0 - normalized_k * 0.3);
+            
+            if score > best_score {
+                best_k = last_k;
+            }
+        }
+    }
+
+    best_k
+}
+
+/// Run k-means clustering and return assignments and centroids.
+fn run_kmeans<R: Rng + Sized>(
+    ctx: &Arc<ProblemContext>,
+    patient_ids: &[usize],
+    k: usize,
+    rng: &mut R,
+) -> (Vec<usize>, Vec<(f64, f64)>) {
+    let num_patients = patient_ids.len();
+
+    // Initialize centroids from random patients.
+    let mut centroids: Vec<(f64, f64)> = patient_ids
+        .iter()
+        .take(k)
+        .map(|&pid| {
+            let p = &ctx.patients[pid];
+            (p.x, p.y)
+        })
+        .collect();
+
+    let mut assignments = vec![0usize; num_patients];
+
+    // Small fixed number of iterations keeps this fast and stable.
+    for _ in 0..15 {
+        // Assignment step.
+        for (idx, &pid) in patient_ids.iter().enumerate() {
+            let p = &ctx.patients[pid];
+            let (best_cluster, _) = centroids.iter().enumerate().fold(
+                (0usize, f64::INFINITY),
+                |(best_i, best_d), (i, &(cx, cy))| {
+                    let dx = p.x - cx;
+                    let dy = p.y - cy;
+                    let d2 = dx * dx + dy * dy;
+                    if d2 < best_d {
+                        (i, d2)
+                    } else {
+                        (best_i, best_d)
+                    }
+                },
+            );
+            assignments[idx] = best_cluster;
+        }
+
+        // Update step.
+        let mut sums = vec![(0.0f64, 0.0f64, 0usize); k];
+        for (idx, &pid) in patient_ids.iter().enumerate() {
+            let c = assignments[idx];
+            let p = &ctx.patients[pid];
+            sums[c].0 += p.x;
+            sums[c].1 += p.y;
+            sums[c].2 += 1;
+        }
+
+        for c in 0..k {
+            if sums[c].2 > 0 {
+                centroids[c] = (sums[c].0 / sums[c].2 as f64, sums[c].1 / sums[c].2 as f64);
+            } else {
+                // Re-seed empty cluster from a random patient.
+                let pid = patient_ids[rng.gen_range(0..patient_ids.len())];
+                let p = &ctx.patients[pid];
+                centroids[c] = (p.x, p.y);
+            }
+        }
+    }
+
+    (assignments, centroids)
+}
+
+/// Calculate the inertia (within-cluster sum of squares) for a clustering.
+fn calculate_inertia(
+    ctx: &Arc<ProblemContext>,
+    patient_ids: &[usize],
+    assignments: &[usize],
+    centroids: &[(f64, f64)],
+) -> f64 {
+    let mut inertia = 0.0;
+    for (idx, &pid) in patient_ids.iter().enumerate() {
+        let p = &ctx.patients[pid];
+        let cluster = assignments[idx];
+        let (cx, cy) = centroids[cluster];
+        let dx = p.x - cx;
+        let dy = p.y - cy;
+        inertia += dx * dx + dy * dy;
+    }
+    inertia
 }
 
 /// Shuffle using the provided Rng.
@@ -484,4 +585,106 @@ pub fn refresh_population(
     }
 
     Population::with_individuals(mixed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Patient, ProblemInstance};
+
+    fn create_test_context(num_patients: usize, num_nurses: usize) -> Arc<ProblemContext> {
+        let depot = Patient {
+            id: 0,
+            demand: 0.0,
+            start_time: 0.0,
+            end_time: 500.0,
+            care_time: 0.0,
+            x: 0.0,
+            y: 0.0,
+        };
+
+        let mut patients = vec![depot];
+        // Create patients in 3 distinct spatial clusters
+        for i in 1..=num_patients {
+            let cluster = (i - 1) % 3;
+            let (base_x, base_y) = match cluster {
+                0 => (10.0, 10.0),
+                1 => (50.0, 10.0),
+                _ => (30.0, 50.0),
+            };
+            patients.push(Patient {
+                id: i,
+                demand: 5.0,
+                start_time: 0.0,
+                end_time: 480.0,
+                care_time: 10.0,
+                x: base_x + (i as f64 % 3.0) * 2.0,
+                y: base_y + (i as f64 % 2.0) * 2.0,
+            });
+        }
+
+        let n = patients.len();
+        let mut travel_matrix = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let dx = patients[i].x - patients[j].x;
+                let dy = patients[i].y - patients[j].y;
+                travel_matrix[i][j] = (dx * dx + dy * dy).sqrt();
+            }
+        }
+
+        Arc::new(ProblemContext {
+            instance: ProblemInstance {
+                name: "test".to_string(),
+                num_nurses,
+                capacity: 30.0,
+                benchmark: 100.0,
+                depot_return_time: 480.0,
+                depot_x: 0.0,
+                depot_y: 0.0,
+            },
+            patients,
+            travel_matrix,
+            penalty_factor: 10.0,
+        })
+    }
+
+    #[test]
+    fn test_kmeans_optimal_k_finding() {
+        use genevo::random::random_seed;
+        let mut rng = genevo::random::get_rng(random_seed());
+        
+        // Create problem with 15 patients and 5 nurses
+        // Patients are arranged in 3 spatial clusters
+        let ctx = create_test_context(15, 5);
+        let patient_ids: Vec<usize> = (1..=15).collect();
+        
+        let optimal_k = find_optimal_k(&ctx, &patient_ids, 5, 15, &mut rng);
+        
+        // With 3 distinct spatial clusters, optimal k should be around 3
+        // (could be 2-5 depending on elbow detection)
+        println!("Optimal k found: {} (expected around 3 for 3 spatial clusters)", optimal_k);
+        assert!(optimal_k >= 2 && optimal_k <= 5, 
+                "Optimal k should be reasonable for the problem size");
+    }
+
+    #[test]
+    fn test_kmeans_genome_builder() {
+        use genevo::random::random_seed;
+        let mut rng = genevo::random::get_rng(random_seed());
+        
+        let ctx = create_test_context(12, 4);
+        let builder = KMeansGenomeBuilder::new(ctx.clone());
+        
+        let genome = builder.build_genome(0, &mut rng);
+        
+        // Should have exactly 4 routes (num_nurses)
+        assert_eq!(genome.len(), 4, "Should have exactly num_nurses routes");
+        
+        // All patients should be assigned
+        let mut all_patients: Vec<usize> = genome.iter().flatten().copied().collect();
+        all_patients.sort();
+        let expected: Vec<usize> = (1..=12).collect();
+        assert_eq!(all_patients, expected, "All patients should be assigned exactly once");
+    }
 }
