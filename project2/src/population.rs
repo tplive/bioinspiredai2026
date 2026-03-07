@@ -1,16 +1,12 @@
-use std::sync::Arc;
-use genevo::population::GenomeBuilder;
-use genevo::random::Rng;
-use crate::fitness::Genome;
+use crate::fitness::{Genome, compute_individual};
 use crate::types::ProblemContext;
-
-// ── Random genome builder ─────────────────────────────────────────────────────
+use genevo::population::{GenomeBuilder, Population, build_population};
+use genevo::random::{Rng, Seed};
+use std::cmp::Ordering;
+use std::sync::Arc;
 
 /// Builds random genomes by shuffling all patient IDs and distributing them
 /// evenly across nurses.
-///
-/// Mirrors Julia's `init_rand_individual`.
-#[derive(Clone, Debug)]
 pub struct RandomGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -29,26 +25,20 @@ impl GenomeBuilder<Genome> for RandomGenomeBuilder {
         let num_nurses = self.ctx.instance.num_nurses;
         let num_patients = self.ctx.patients.len() - 1; // subtract dummy depot at [0]
 
-        // Build a shuffled list of patient IDs (1-based).
+        // Build a shuffled list of patient IDs
         let mut ids: Vec<usize> = (1..=num_patients).collect();
-        fisher_yates_shuffle(&mut ids, rng);
+        shuffle(&mut ids, rng);
 
+        // even number of patients for each nurse
         split_into_routes(ids, num_nurses)
     }
 }
 
-// ── Clarke-Wright Savings genome builder ─────────────────────────────────────
+// Clarke-Wright Savings genome builder
+// -because I thought it could be a good fit..
 
+// https://www.kaggle.com/code/mayanksethia/clark-wright-savings-algorithm
 /// Builds genomes using the Clarke-Wright Savings algorithm.
-///
-/// The classic VRP heuristic:
-/// 1. Calculate savings s(i,j) = d(0,i) + d(0,j) - d(i,j) for all patient pairs
-/// 2. Sort savings in descending order
-/// 3. Start with each patient in a separate route
-/// 4. For each saving, merge routes if feasible (respects capacity)
-///
-/// This often produces high-quality initial solutions for VRP problems.
-#[derive(Clone, Debug)]
 pub struct ClarkeWrightGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -165,7 +155,7 @@ impl GenomeBuilder<Genome> for ClarkeWrightGenomeBuilder {
         }
 
         // Shuffle routes to add some randomness between runs
-        fisher_yates_shuffle(&mut routes, rng);
+        shuffle(&mut routes, rng);
 
         // Ensure we have exactly num_nurses routes by splitting or padding
         let num_nurses = self.ctx.instance.num_nurses;
@@ -173,14 +163,11 @@ impl GenomeBuilder<Genome> for ClarkeWrightGenomeBuilder {
     }
 }
 
-// ── Nearest-neighbour genome builder ─────────────────────────────────────────
+//  Nearest-neighbour genome builder
 
 /// Builds genomes using a simple nearest-neighbour heuristic:
 /// each nurse starts at a random patient and greedily visits the
 /// nearest unvisited patient until the route reaches `route_length`.
-///
-/// Mirrors Julia's `init_individual_nearest_neighbour`.
-#[derive(Clone, Debug)]
 pub struct NearestNeighbourGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -245,7 +232,7 @@ impl GenomeBuilder<Genome> for NearestNeighbourGenomeBuilder {
             routes.push(route);
         }
 
-        // If any patients are leftover (shouldn't happen, but guard against it).
+        // If any patients are leftover
         if !remaining.is_empty() {
             routes.last_mut().unwrap().extend(remaining);
         }
@@ -254,14 +241,13 @@ impl GenomeBuilder<Genome> for NearestNeighbourGenomeBuilder {
     }
 }
 
-// ── K-means genome builder ───────────────────────────────────────────────────
+// K-means genome builder
+// Aurelien Géron, HOML page 263, and the Julia version from last year
 
 /// Builds genomes by clustering patients with K-means on `(x, y)` coordinates,
 /// then using each cluster as a nurse route.
-///
-/// This tends to create geographically coherent routes while still keeping
-/// diversity through random centroid seeding and intra-route shuffling.
-#[derive(Clone, Debug)]
+/// Assumes that the travel times are somewhat coherent between the coordinates.
+/// and for good results, coordinates must be clusterable..
 pub struct KMeansGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -289,7 +275,7 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
 
         let k = num_nurses.min(num_patients).max(1);
         let mut patient_ids: Vec<usize> = (1..=num_patients).collect();
-        fisher_yates_shuffle(&mut patient_ids, rng);
+        shuffle(&mut patient_ids, rng);
 
         // Initialize centroids from random patients.
         let mut centroids: Vec<(f64, f64)> = patient_ids
@@ -308,15 +294,19 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
             // Assignment step.
             for (idx, &pid) in patient_ids.iter().enumerate() {
                 let p = &self.ctx.patients[pid];
-                let (best_cluster, _) = centroids
-                    .iter()
-                    .enumerate()
-                    .fold((0usize, f64::INFINITY), |(best_i, best_d), (i, &(cx, cy))| {
+                let (best_cluster, _) = centroids.iter().enumerate().fold(
+                    (0usize, f64::INFINITY),
+                    |(best_i, best_d), (i, &(cx, cy))| {
                         let dx = p.x - cx;
                         let dy = p.y - cy;
                         let d2 = dx * dx + dy * dy;
-                        if d2 < best_d { (i, d2) } else { (best_i, best_d) }
-                    });
+                        if d2 < best_d {
+                            (i, d2)
+                        } else {
+                            (best_i, best_d)
+                        }
+                    },
+                );
                 assignments[idx] = best_cluster;
             }
 
@@ -332,10 +322,7 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
 
             for c in 0..k {
                 if sums[c].2 > 0 {
-                    centroids[c] = (
-                        sums[c].0 / sums[c].2 as f64,
-                        sums[c].1 / sums[c].2 as f64,
-                    );
+                    centroids[c] = (sums[c].0 / sums[c].2 as f64, sums[c].1 / sums[c].2 as f64);
                 } else {
                     // Re-seed empty cluster from a random patient.
                     let pid = patient_ids[rng.gen_range(0..patient_ids.len())];
@@ -352,17 +339,15 @@ impl GenomeBuilder<Genome> for KMeansGenomeBuilder {
 
         // Add diversity in visit order inside each spatial cluster.
         for route in &mut routes {
-            fisher_yates_shuffle(route, rng);
+            shuffle(route, rng);
         }
 
         balance_routes(routes, num_nurses)
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Fisher-Yates in-place shuffle using the provided Rng.
-pub fn fisher_yates_shuffle<T, R: Rng + Sized>(slice: &mut [T], rng: &mut R) {
+/// Shuffle using the provided Rng.
+pub fn shuffle<T, R: Rng + Sized>(slice: &mut [T], rng: &mut R) {
     let len = slice.len();
     if len <= 1 {
         return;
@@ -441,11 +426,62 @@ fn balance_routes(mut routes: Vec<Vec<usize>>, num_nurses: usize) -> Genome {
         let idx1 = indexed[0].0;
         let idx2 = indexed[1].0;
 
-        let (low_idx, high_idx) = if idx1 < idx2 { (idx1, idx2) } else { (idx2, idx1) };
+        let (low_idx, high_idx) = if idx1 < idx2 {
+            (idx1, idx2)
+        } else {
+            (idx2, idx1)
+        };
 
         let route2 = routes.remove(high_idx);
         routes[low_idx].extend(route2);
     }
 
     routes
+}
+
+//Population refresh
+/// Refreshes the population by keeping the best individuals and replacing the rest
+/// with newly generated random individuals.
+///
+/// # Arguments
+/// * `current_population` - The current population to refresh
+/// * `ctx` - Problem context
+/// * `pop_size` - Target population size
+/// * `replace_ratio` - Fraction of population to replace (0.0 to 1.0)
+/// * `seed` - Random seed for generating new individuals
+pub fn refresh_population(
+    current_population: &[Genome],
+    ctx: &Arc<ProblemContext>,
+    pop_size: usize,
+    replace_ratio: f64,
+    seed: Seed,
+) -> Population<Genome> {
+    let bounded_ratio = replace_ratio.clamp(0.0, 1.0);
+    let replace_count = ((pop_size as f64) * bounded_ratio).round() as usize;
+    let replace_count = replace_count.min(pop_size);
+    let keep_count = pop_size.saturating_sub(replace_count);
+
+    let mut ranked: Vec<(f64, Genome)> = current_population
+        .iter()
+        .cloned()
+        .map(|genome| (compute_individual(&genome, ctx).fitness, genome))
+        .collect();
+    ranked.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+
+    let mut mixed: Vec<Genome> = ranked
+        .into_iter()
+        .take(keep_count.min(current_population.len()))
+        .map(|(_, genome)| genome)
+        .collect();
+
+    let missing = pop_size.saturating_sub(mixed.len());
+    if missing > 0 {
+        let random_population: Population<Genome> = build_population()
+            .with_genome_builder(RandomGenomeBuilder::new(Arc::clone(ctx)))
+            .of_size(missing)
+            .using_seed(seed);
+        mixed.extend(random_population.individuals().iter().cloned());
+    }
+
+    Population::with_individuals(mixed)
 }
