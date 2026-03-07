@@ -73,7 +73,7 @@ impl MutationOp<Genome> for NurseMutation {
         let gens_without_improvement = *self.generations_without_improvement.lock().unwrap();
 
         // Apply hill climbing instead of normal mutation when stagnating (100-179 gens without improvement)
-        if gens_without_improvement >= 100 && gens_without_improvement < 180 {
+        if (100..180).contains(&gens_without_improvement) {
             return hill_climb(&genome, &self.ctx, self.hill_climb_steps, rng);
         }
 

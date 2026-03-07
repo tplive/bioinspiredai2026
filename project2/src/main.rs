@@ -146,11 +146,11 @@ impl Cli {
 
 fn main() {
     //  Parse CLI and resolve full configuration
-    let cli = Cli::parse();
-    let input_config_path = cli.config.clone();
+    let mut cli = Cli::parse();
+    let input_config_path = cli.config.take();
 
     // Start from default values, overlay config file if given.
-    let base = match &cli.config {
+    let base = match input_config_path.as_ref() {
         Some(path) => config::load_file(path).unwrap_or_else(|e| {
             eprintln!("Error: {e}");
             std::process::exit(1);
@@ -169,8 +169,7 @@ fn main() {
         }),
         None => genevo::random::random_seed(), // Use random seed if not given
     };
-    let run_seed_hex = seed_to_hex(&run_seed);
-    cfg.random_seed = Some(run_seed_hex.clone());
+    cfg.random_seed = Some(seed_to_hex(&run_seed));
 
     // Results foler and files
     let run_dir = create_run_dir(&cfg.file).unwrap_or_else(|e| {
@@ -226,7 +225,10 @@ fn main() {
     println!("Init method:      {}", cfg.init);
     println!("Refresh after:    {}", cfg.stagnation_replace_after);
     println!("Refresh ratio:    {:.2}", cfg.stagnation_replace_ratio);
-    println!("Random seed:      {}", run_seed_hex);
+    println!(
+        "Random seed:      {}",
+        cfg.random_seed.as_deref().unwrap_or("<none>")
+    );
     println!("Run directory:    {}", run_dir.display());
     println!();
     println!("Loaded and parsed input in {:?}", Instant::now()-now);
@@ -262,9 +264,9 @@ fn main() {
     let history = ga_results.history;
 
     //  Print final solution
-    if let Some(genome) = best_genome.clone() {
+    if let Some(genome) = best_genome.as_ref() {
         println!();
-        let ind = compute_individual(&genome, &ctx);
+        let ind = compute_individual(genome, &ctx);
         let pct_diff = (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark * 100.0;
 
         println!("  Minimal travel:  {:.4}", ind.total_travel);
@@ -342,7 +344,7 @@ fn main() {
             // Route plot
             let route_plot = run_dir.join("routes.png");
             if let Err(e) = plot::save_route_plot(
-                &genome,
+                genome,
                 &ctx,
                 &cfg,
                 ind.fitness,

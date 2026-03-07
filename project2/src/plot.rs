@@ -75,13 +75,13 @@ pub fn save_plot(
     chart
         .draw_series(LineSeries::new(to_cost_series(history, max_gen), &BLUE))?
         .label("Cost (travel + penalty)")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
 
     // Step line – travel time only (to show where penalty applied).
     chart
         .draw_series(LineSeries::new(to_travel_series(history, max_gen), &GREEN))?
         .label("Travel time")
-        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], GREEN));
 
     // Benchmark reference line.
     chart
@@ -126,7 +126,7 @@ pub fn save_plot(
     chart
         .configure_series_labels()
         .background_style(WHITE.mix(0.9))
-        .border_style(&BLACK)
+        .border_style(BLACK)
         .draw()?;
 
     // ── Right panel ───────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ pub fn save_plot(
 
     // ── Config section ────────────────────────────────────────────────────────
     legend_area.draw(&Text::new("Configuration", (16, 18), hdr.clone()))?;
-    draw_hsep(&legend_area, 36, W - CHART_W, sep.clone())?;
+    draw_hsep(&legend_area, 36, W - CHART_W, sep)?;
 
     let cfg_rows: &[(&str, String)] = &[
         ("Instance",    instance_name.to_string()),

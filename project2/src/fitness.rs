@@ -4,17 +4,17 @@ use rayon::prelude::*;
 use crate::types::{IndividualResult, ProblemContext, RouteResult};
 
 /// Detailed information for a single patient visit within a route.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PatientVisit {
     pub patient_id: usize,
     pub arrival_time: f64,
     pub start_window: f64,
     pub end_window: f64,
-    pub demand: f64,
+    //pub demand: f64,
 }
 
 /// Detailed information for a complete nurse route.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DetailedRoute {
     pub route_duration: f64,
     pub route_demand: f64,
@@ -147,7 +147,7 @@ pub fn compute_detailed_route(route: &[usize], ctx: &ProblemContext) -> Detailed
             arrival_time,
             start_window: patients[id].start_time,
             end_window: patients[id].end_time,
-            demand: patients[id].demand,
+            //demand: patients[id].demand,
         });
 
         prev_id = id;
