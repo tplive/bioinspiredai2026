@@ -9,7 +9,11 @@ mod population;
 mod types;
 
 use std::{
+    env::current_dir,
+    fs::copy,
+    io::{Write, stdout},
     path::{Path, PathBuf},
+    process::exit,
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -17,24 +21,17 @@ use std::{
 use clap::Parser;
 use config::PartialConfig;
 
-use genevo::{
-    operator::prelude::*,
-    population::build_population,
-    prelude::*,
-    types::fmt::Display,
-};
+use genevo::{operator::prelude::*, population::build_population, prelude::*, types::fmt::Display};
 
 use crossover::RouteCrossover;
-use fitness::{compute_individual, compute_detailed_route, Genome, NurseFitness};
+use fitness::{Genome, NurseFitness, compute_detailed_route, compute_individual};
 use mutation::{MutationType, NurseMutation};
 use population::{
-    ClarkeWrightGenomeBuilder,
-    KMeansGenomeBuilder,
-    NearestNeighbourGenomeBuilder,
-    RandomGenomeBuilder,
+    ClarkeWrightGenomeBuilder, KMeansGenomeBuilder, NearestNeighbourGenomeBuilder,
+    RandomGenomeBuilder, refresh_population,
 };
 
-//  CLI definition 
+//  CLI definition
 
 /// Configuration is resolved in this priority order (highest wins):
 ///
@@ -48,39 +45,39 @@ use population::{
 #[derive(Parser, Debug)]
 #[command(verbatim_doc_comment)]
 struct Cli {
-    /// Path to a TOML configuration file (optional; all keys are optional inside it too).
+    /// Path to TOML config file
     #[arg(short = 'C', long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    /// Problem instance JSON file.
+    /// Problem instance JSON file
     #[arg(short = 'f', long, value_name = "FILE")]
     file: Option<String>,
 
-    /// Number of individuals in the population.
+    /// Number of individuals in the population
     #[arg(short = 'p', long)]
     pop_size: Option<usize>,
 
-    /// Maximum number of generations.
+    /// Maximum number of generations
     #[arg(short = 'g', long)]
     generations: Option<usize>,
 
-    /// Fraction of the population forwarded to the parent pool [0.0–1.0].
+    /// % of the population forwarded to the parent pool [0.0–1.0]
     #[arg(long)]
     selection_ratio: Option<f64>,
 
-    /// Probability of applying crossover to each parent pair [0.0–1.0].
+    /// Probability of applying crossover to each parent pair [0.0–1.0]
     #[arg(long)]
     crossover_rate: Option<f64>,
 
-    /// Probability that an individual is mutated [0.0–1.0].
+    /// Mutation probability [0.0–1.0].
     #[arg(short = 'm', long)]
     mutation_rate: Option<f64>,
 
-    /// Intra-route mutation operator: "swap" or "insert".
+    /// Mutation operator: "swap" or "insert".
     #[arg(long, value_name = "TYPE")]
     mutation_type: Option<String>,
 
-    /// Fraction of offspring kept in the next generation [0.0–1.0].
+    /// % of offspring kept in the next generation [0.0–1.0]
     #[arg(long)]
     reinsertion_ratio: Option<f64>,
 
@@ -88,35 +85,35 @@ struct Cli {
     #[arg(long)]
     penalty_factor: Option<f64>,
 
-    /// Population initialisation method: "random", "nn" (nearest-neighbour), "cw" (clarke-wright), or "kmeans".
+    /// Population initialisation method: "random", "nn" (nearest-neighbour), "cw" (clarke-wright), or "kmeans" (kmeans clustering)
     #[arg(short = 'i', long)]
     init: Option<String>,
 
-    /// Selection method: "truncation" or "tournament".
+    /// Selection method: "truncation" or "tournament"
     #[arg(long)]
     selection_type: Option<String>,
 
-    /// Tournament size for tournament selection (typically 2-5).
+    /// Tournament size for tournament selection (typically 2-5)
     #[arg(long)]
     tournament_size: Option<usize>,
 
-    /// Save route/fitness PNGs after the run (inside the per-run folder).
+    /// Plot and save to PNG after the run; results/run_<timestamp>_<instance file name>_<rand suff>/*
     #[arg(long, action = clap::ArgAction::SetTrue)]
     plot: bool,
 
-    /// Optional deterministic random seed as 64 hex chars (32 bytes).
+    /// Optional deterministic random seed as 64 hex chars (32 bytes)
     #[arg(long, value_name = "HEX32")]
     random_seed: Option<String>,
 
-    /// Replace population after this many generations without improvement.
+    /// Replace population after this many generations without improvement
     #[arg(long)]
     stagnation_replace_after: Option<usize>,
 
-    /// Fraction of population to replace on stagnation refresh [0.0–1.0].
+    /// Fraction of population to replace on stagnation refresh [0.0–1.0]
     #[arg(long)]
     stagnation_replace_ratio: Option<f64>,
 
-    /// Number of hill climbing steps when stagnating (100-179 gens without improvement).
+    /// Number of hill climbing steps when stagnating
     #[arg(long)]
     hill_climb_steps: Option<usize>,
 }
@@ -124,20 +121,20 @@ struct Cli {
 impl Cli {
     fn into_partial(self) -> PartialConfig {
         PartialConfig {
-            file:              self.file,
-            pop_size:          self.pop_size,
-            generations:       self.generations,
-            selection_ratio:   self.selection_ratio,
-            crossover_rate:    self.crossover_rate,
-            mutation_rate:     self.mutation_rate,
-            mutation_type:     self.mutation_type,
+            file: self.file,
+            pop_size: self.pop_size,
+            generations: self.generations,
+            selection_ratio: self.selection_ratio,
+            crossover_rate: self.crossover_rate,
+            mutation_rate: self.mutation_rate,
+            mutation_type: self.mutation_type,
             reinsertion_ratio: self.reinsertion_ratio,
-            penalty_factor:    self.penalty_factor,
-            init:              self.init,
-            selection_type:    self.selection_type,
-            tournament_size:   self.tournament_size,
-            plot:              if self.plot { Some(true) } else { None },
-            random_seed:       self.random_seed,
+            penalty_factor: self.penalty_factor,
+            init: self.init,
+            selection_type: self.selection_type,
+            tournament_size: self.tournament_size,
+            plot: if self.plot { Some(true) } else { None },
+            random_seed: self.random_seed,
             stagnation_replace_after: self.stagnation_replace_after,
             stagnation_replace_ratio: self.stagnation_replace_ratio,
             hill_climb_steps: self.hill_climb_steps,
@@ -145,14 +142,14 @@ impl Cli {
     }
 }
 
-//  Entry point 
+//  Entry point
 
 fn main() {
-    //  Parse CLI and resolve full configuration 
+    //  Parse CLI and resolve full configuration
     let cli = Cli::parse();
     let input_config_path = cli.config.clone();
 
-    // Layer 1 → 2: start from defaults, overlay config file if given.
+    // Start from default values, overlay config file if given.
     let base = match &cli.config {
         Some(path) => config::load_file(path).unwrap_or_else(|e| {
             eprintln!("Error: {e}");
@@ -161,33 +158,38 @@ fn main() {
         None => config::Config::default(),
     };
 
-    // Layer 3: overlay explicit CLI flags on top.
+    // CLI flags take precedence over config file
     let mut cfg = cli.into_partial().apply_onto(base);
 
+    // If random seed given, use it to recreate previous results. Should be deterministic.
     let run_seed = match cfg.random_seed.as_deref() {
         Some(hex) => parse_seed_hex(hex).unwrap_or_else(|e| {
             eprintln!("Invalid --random-seed/config random_seed: {e}");
-            std::process::exit(1);
+            exit(1);
         }),
-        None => genevo::random::random_seed(),
+        None => genevo::random::random_seed(), // Use random seed if not given
     };
     let run_seed_hex = seed_to_hex(&run_seed);
     cfg.random_seed = Some(run_seed_hex.clone());
 
+    // Results foler and files
     let run_dir = create_run_dir(&cfg.file).unwrap_or_else(|e| {
         eprintln!("Could not create run directory: {e}");
-        std::process::exit(1);
+        exit(1);
     });
 
     let used_config_path = run_dir.join("config_used.toml");
     if let Err(e) = write_used_config(&cfg, &used_config_path) {
-        eprintln!("Could not write used config '{}': {e}", used_config_path.display());
-        std::process::exit(1);
+        eprintln!(
+            "Could not write used config '{}': {e}",
+            used_config_path.display()
+        );
+        exit(1);
     }
 
     if let Some(path) = input_config_path {
         let original_cfg_copy = run_dir.join("config_input.toml");
-        if let Err(e) = std::fs::copy(&path, &original_cfg_copy) {
+        if let Err(e) = copy(&path, &original_cfg_copy) {
             eprintln!(
                 "Warning: could not copy input config '{}' to '{}': {e}",
                 path.display(),
@@ -227,17 +229,17 @@ fn main() {
     println!("Run directory:    {}", run_dir.display());
     println!();
 
-    //  Build initial population 
+    //  Build initial population
     let initial_population: Population<Genome> = match cfg.init.as_str() {
         "nn" => build_population()
             .with_genome_builder(NearestNeighbourGenomeBuilder::new(Arc::clone(&ctx)))
             .of_size(cfg.pop_size)
             .using_seed(run_seed),
-        "cw" | "clarke-wright" => build_population()
+        "cw" => build_population()
             .with_genome_builder(ClarkeWrightGenomeBuilder::new(Arc::clone(&ctx)))
             .of_size(cfg.pop_size)
             .using_seed(run_seed),
-        "kmeans" | "km" => build_population()
+        "kmeans" => build_population()
             .with_genome_builder(KMeansGenomeBuilder::new(Arc::clone(&ctx)))
             .of_size(cfg.pop_size)
             .using_seed(run_seed),
@@ -247,7 +249,7 @@ fn main() {
             .using_seed(run_seed),
     };
 
-    //  Run the simulation loop 
+    //  Run the simulation loop
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
@@ -305,141 +307,155 @@ fn main() {
 
         'sim: loop {
             match sim.step() {
-            Ok(SimResult::Intermediate(step)) => {
-                let ep = &step.result.evaluated_population;
-                let bs = &step.result.best_solution;
-                let global_generation = generation_offset + step.iteration;
+                Ok(SimResult::Intermediate(step)) => {
+                    let ep = &step.result.evaluated_population;
+                    let bs = &step.result.best_solution;
+                    let global_generation = generation_offset + step.iteration;
 
-                // Calculate actual population diversity using Hamming distance
-                let population_genomes: Vec<Genome> = ep.individuals()
-                    .iter()
-                    .cloned()
-                    .collect();
-                let current_diversity = mutation::calculate_population_diversity(&population_genomes);
-                mutation::update_mutation_rate(&mutation_op_ref, current_diversity, cfg.mutation_rate);
-
-                if bs.solution.fitness > best_fitness {
-                    let prev_best_cost = best_cost;
-                    best_fitness = bs.solution.fitness;
-                    best_generation = global_generation;
-                    generations_without_improvement = 0;
-                    *generations_without_improvement_shared.lock().unwrap() = 0;
-                    best_genome = Some(bs.solution.genome.clone());
-                    generations_without_improvement = 0;
-                    best_genome = Some(bs.solution.genome.clone());
-
-                    // Decode the fitness value back to actual cost.
-                    let ind = compute_individual(&bs.solution.genome, &ctx);
-                    best_cost = ind.fitness;
-                    best_feasible = ind.feasible;
-                    history.push(plot::HistoryPoint {
-                        generation: global_generation,
-                        travel: ind.total_travel,
-                        penalty: ind.total_penalty,
-                        feasible: ind.feasible,
-                    });
-                    let pct_diff =
-                        (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark
-                            * 100.0;
-                    let cost_delta = if prev_best_cost.is_finite() {
-                        ind.fitness - prev_best_cost
-                    } else {
-                        0.0
-                    };
-
-                    let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
-                    println!(
-                        "\nGen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
-                        global_generation,
-                        ind.fitness,
-                        cost_delta,
-                        ind.total_travel,
-                        ind.total_penalty,
-                        current_mutation_rate,
+                    // Calculate actual population diversity using Hamming distance
+                    let population_genomes: Vec<Genome> =
+                        ep.individuals().iter().cloned().collect();
+                    let current_diversity =
+                        mutation::calculate_population_diversity(&population_genomes);
+                    mutation::update_mutation_rate(
+                        &mutation_op_ref,
                         current_diversity,
-                        if ind.feasible { "" } else { "NOT " },
-                        if ind.feasible { "" } else { "  " },
-                        pct_diff,
+                        cfg.mutation_rate,
                     );
-                } else {
-                    generations_without_improvement += 1;
-                    *generations_without_improvement_shared.lock().unwrap() = generations_without_improvement;
-                    
-                    // Print visual indicator for hill climbing activation
-                    if generations_without_improvement >= 100 && generations_without_improvement < 180 {
-                        print!("0"); // Julia uses '0' to indicate hill climbing
+
+                    if bs.solution.fitness > best_fitness {
+                        let prev_best_cost = best_cost;
+                        best_fitness = bs.solution.fitness;
+                        best_generation = global_generation;
+                        generations_without_improvement = 0;
+                        *generations_without_improvement_shared.lock().unwrap() = 0;
+                        best_genome = Some(bs.solution.genome.clone());
+                        generations_without_improvement = 0;
+                        best_genome = Some(bs.solution.genome.clone());
+
+                        // Decode the fitness value back to actual cost.
+                        let ind = compute_individual(&bs.solution.genome, &ctx);
+                        best_cost = ind.fitness;
+                        best_feasible = ind.feasible;
+                        history.push(plot::HistoryPoint {
+                            generation: global_generation,
+                            travel: ind.total_travel,
+                            penalty: ind.total_penalty,
+                            feasible: ind.feasible,
+                        });
+                        let pct_diff = (ind.total_travel - ctx.instance.benchmark)
+                            / ctx.instance.benchmark
+                            * 100.0;
+                        let cost_delta = if prev_best_cost.is_finite() {
+                            ind.fitness - prev_best_cost
+                        } else {
+                            0.0
+                        };
+
+                        let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
+                        println!(
+                            "\nGen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
+                            global_generation,
+                            ind.fitness,
+                            cost_delta,
+                            ind.total_travel,
+                            ind.total_penalty,
+                            current_mutation_rate,
+                            current_diversity,
+                            if ind.feasible { "" } else { "NOT " },
+                            if ind.feasible { "" } else { "  " },
+                            pct_diff,
+                        );
                     } else {
-                        print!(".");
+                        generations_without_improvement += 1;
+                        *generations_without_improvement_shared.lock().unwrap() =
+                            generations_without_improvement;
+
+                        // Print visual indicator for hill climbing activation
+                        if generations_without_improvement >= 100
+                            && generations_without_improvement < 180
+                        {
+                            print!("0"); // Julia uses '0' to indicate hill climbing
+                        } else {
+                            print!(".");
+                        }
+                        use Write;
+                        let _ = stdout().flush();
+
+                        // Early stop after 200 generations without improvement, but only if best solution is feasible
+                        if best_feasible
+                            && generations_without_improvement >= EARLY_STOP_GENERATIONS
+                        {
+                            println!();
+                            println!("{:-<60}", "");
+                            println!(
+                                "Early stopping: No improvement for {} generations (best solution is feasible)",
+                                EARLY_STOP_GENERATIONS
+                            );
+                            should_stop = true;
+                            break 'sim;
+                        }
                     }
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-                    
-                    // Early stop after 200 generations without improvement, but only if best solution is feasible
-                    if best_feasible && generations_without_improvement >= EARLY_STOP_GENERATIONS {
-                        println!();
-                        println!("{:-<60}", "");
-                        println!("Early stopping: No improvement for {} generations (best solution is feasible)", EARLY_STOP_GENERATIONS);
-                        should_stop = true;
-                        break 'sim;
+
+                    if cfg.stagnation_replace_after > 0
+                        && generations_without_improvement >= cfg.stagnation_replace_after as u64
+                    {
+                        print!(":");
+                        use Write;
+                        let _ = stdout().flush();
+
+                        let replacement_seed = derive_seed(&run_seed, restart_counter + 1);
+                        current_population = refresh_population(
+                            &population_genomes,
+                            &ctx,
+                            cfg.pop_size,
+                            cfg.stagnation_replace_ratio,
+                            replacement_seed,
+                        );
+
+                        generations_without_improvement = 0;
+                        *generations_without_improvement_shared.lock().unwrap() = 0;
+                        generation_offset = global_generation;
+                        restart_counter += 1;
+                        println!(
+                            "\nPopulation refresh at generation {} (replace ratio {:.2})",
+                            global_generation, cfg.stagnation_replace_ratio
+                        );
+                        continue 'run;
                     }
+
+                    let _ = (
+                        ep.average_fitness(),
+                        step.duration.fmt(),
+                        step.processing_time.fmt(),
+                    );
                 }
 
-                if cfg.stagnation_replace_after > 0
-                    && generations_without_improvement >= cfg.stagnation_replace_after as u64
-                {
-                    print!(":");
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-
-                    let replacement_seed = derive_seed(&run_seed, restart_counter + 1);
-                    current_population = refresh_population(
-                        &population_genomes,
-                        &ctx,
-                        cfg.pop_size,
-                        cfg.stagnation_replace_ratio,
-                        replacement_seed,
-                    );
-
-                    generations_without_improvement = 0;
-                    *generations_without_improvement_shared.lock().unwrap() = 0;
-                    generation_offset = global_generation;
-                    restart_counter += 1;
+                Ok(SimResult::Final(step, processing_time, duration, stop_reason)) => {
+                    println!();
+                    println!("{:-<60}", "");
+                    println!("Simulation finished: {stop_reason}");
                     println!(
-                        "\nPopulation refresh at generation {} (replace ratio {:.2})",
-                        global_generation,
-                        cfg.stagnation_replace_ratio
+                        "Total time: {}  |  Processing time: {}",
+                        duration.fmt(),
+                        processing_time.fmt()
                     );
-                    continue 'run;
+                    println!("Best fitness found in generation {best_generation}");
+
+                    generation_offset += step.iteration;
+
+                    if best_genome.is_none() {
+                        best_genome = Some(step.result.best_solution.solution.genome.clone());
+                    }
+                    break 'sim;
                 }
 
-                let _ = (ep.average_fitness(), step.duration.fmt(), step.processing_time.fmt());
-            }
-
-            Ok(SimResult::Final(step, processing_time, duration, stop_reason)) => {
-                println!();
-                println!("{:-<60}", "");
-                println!("Simulation finished: {stop_reason}");
-                println!(
-                    "Total time: {}  |  Processing time: {}",
-                    duration.fmt(),
-                    processing_time.fmt()
-                );
-                println!("Best fitness found in generation {best_generation}");
-
-                generation_offset += step.iteration;
-
-                if best_genome.is_none() {
-                    best_genome = Some(step.result.best_solution.solution.genome.clone());
+                Err(e) => {
+                    eprintln!("Simulation error: {e}");
+                    should_stop = true;
+                    break 'sim;
                 }
-                break 'sim;
             }
-
-            Err(e) => {
-                eprintln!("Simulation error: {e}");
-                should_stop = true;
-                break 'sim;
-            }
-        }
         }
 
         if should_stop {
@@ -447,12 +463,11 @@ fn main() {
         }
     }
 
-    //  Print final solution 
+    //  Print final solution
     if let Some(genome) = best_genome {
         println!();
         let ind = compute_individual(&genome, &ctx);
-        let pct_diff =
-            (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark * 100.0;
+        let pct_diff = (ind.total_travel - ctx.instance.benchmark) / ctx.instance.benchmark * 100.0;
 
         println!("  Minimal travel:  {:.4}", ind.total_travel);
         println!("+ Penalty:         {:.4}", ind.total_penalty);
@@ -464,20 +479,26 @@ fn main() {
         );
 
         println!();
-        
+
         // Format route output
         let mut route_output = String::new();
         route_output.push_str(&format!("Nurse capacity: {:.0}\n", ctx.instance.capacity));
-        route_output.push_str(&format!("Depot return time: {:.2}\n", ctx.instance.depot_return_time));
+        route_output.push_str(&format!(
+            "Depot return time: {:.2}\n",
+            ctx.instance.depot_return_time
+        ));
         route_output.push_str(&format!("{:-<68}\n", ""));
 
         for (i, route) in genome.iter().enumerate() {
             if route.is_empty() {
-                route_output.push_str(&format!("Nurse {:>2}    0.00     0.00  d(0) -> d(0.00)\n", i + 1));
+                route_output.push_str(&format!(
+                    "Nurse {:>2}    0.00     0.00  d(0) -> d(0.00)\n",
+                    i + 1
+                ));
             } else {
                 let detailed = compute_detailed_route(route, &ctx);
-                
-                // Build route string: d(0) -> patient_i (arrival-departure) [window_start-window_end] -> ... -> d(duration)
+
+                // Build route string: d(0) -> patient_id (arrival-departure) [window_start-window_end] -> ... -> d(duration)
                 let mut route_str = String::from("d(0)");
                 for visit in &detailed.visits {
                     let care_time = ctx.patients[visit.patient_id].care_time;
@@ -504,22 +525,21 @@ fn main() {
         }
 
         route_output.push_str(&format!("{:-<68}\n", ""));
-        route_output.push_str(&format!("Objective value (total duration): {:.2}\n", ind.total_travel));
-
-        // Print to console
-        print!("{}", route_output);
+        route_output.push_str(&format!(
+            "Objective value (total duration): {:.2}\n",
+            ind.total_travel
+        ));
 
         // Save to file
         let output_file = run_dir.join("routes.txt");
         print!("Saving routes → {} ... ", output_file.display());
-        use std::io::Write;
-        let _ = std::io::stdout().flush();
+        let _ = stdout().flush();
         match std::fs::write(&output_file, &route_output) {
             Ok(()) => println!("done."),
             Err(e) => eprintln!("error: {e}"),
         }
 
-        //  Optional plots 
+        //  Optional plots
         if cfg.plot {
             // Route plot
             let route_plot = run_dir.join("routes.png");
@@ -536,7 +556,6 @@ fn main() {
             // Fitness history plot
             let output = run_dir.join("fitness.png");
             print!("Saving plot → {} ... ", output.display());
-            use std::io::Write;
             let _ = std::io::stdout().flush();
             match plot::save_plot(
                 &history,
@@ -553,10 +572,9 @@ fn main() {
 }
 
 fn write_used_config(cfg: &config::Config, output_path: &Path) -> Result<(), String> {
-    let text = toml::to_string_pretty(cfg)
-        .map_err(|e| format!("failed to serialize config: {e}"))?;
-    std::fs::write(output_path, text)
-        .map_err(|e| format!("failed to write file: {e}"))
+    let text =
+        toml::to_string_pretty(cfg).map_err(|e| format!("failed to serialize config: {e}"))?;
+    std::fs::write(output_path, text).map_err(|e| format!("failed to write file: {e}"))
 }
 
 fn create_run_dir(instance_file: &str) -> Result<PathBuf, String> {
@@ -573,7 +591,7 @@ fn create_run_dir(instance_file: &str) -> Result<PathBuf, String> {
     let suffix = random_suffix(4);
 
     let run_name = format!("run_{}_{}_{}", timestamp, instance_tag, suffix);
-    let run_dir = std::env::current_dir()
+    let run_dir = current_dir()
         .map_err(|e| format!("cannot read current dir: {e}"))?
         .join(run_name);
 
@@ -608,7 +626,7 @@ fn random_suffix(len: usize) -> String {
         .collect()
 }
 
-fn seed_to_hex(seed: &genevo::random::Seed) -> String {
+fn seed_to_hex(seed: &Seed) -> String {
     let mut s = String::with_capacity(seed.len() * 2);
     for b in seed {
         s.push_str(&format!("{:02x}", b));
@@ -616,7 +634,7 @@ fn seed_to_hex(seed: &genevo::random::Seed) -> String {
     s
 }
 
-fn parse_seed_hex(hex: &str) -> Result<genevo::random::Seed, String> {
+fn parse_seed_hex(hex: &str) -> Result<Seed, String> {
     let trimmed = hex.trim();
     if trimmed.len() != 64 {
         return Err(format!(
@@ -634,7 +652,7 @@ fn parse_seed_hex(hex: &str) -> Result<genevo::random::Seed, String> {
     Ok(out)
 }
 
-fn derive_seed(base_seed: &genevo::random::Seed, salt: u64) -> genevo::random::Seed {
+fn derive_seed(base_seed: &Seed, salt: u64) -> Seed {
     let mut derived = *base_seed;
     let salt_bytes = salt.to_le_bytes();
     for (i, b) in salt_bytes.iter().enumerate() {
@@ -644,41 +662,4 @@ fn derive_seed(base_seed: &genevo::random::Seed, salt: u64) -> genevo::random::S
         derived[i + 24] = derived[i + 24].wrapping_sub(*b);
     }
     derived
-}
-
-fn refresh_population(
-    current_population: &[Genome],
-    ctx: &Arc<types::ProblemContext>,
-    pop_size: usize,
-    replace_ratio: f64,
-    seed: genevo::random::Seed,
-) -> Population<Genome> {
-    let bounded_ratio = replace_ratio.clamp(0.0, 1.0);
-    let replace_count = ((pop_size as f64) * bounded_ratio).round() as usize;
-    let replace_count = replace_count.min(pop_size);
-    let keep_count = pop_size.saturating_sub(replace_count);
-
-    let mut ranked: Vec<(f64, Genome)> = current_population
-        .iter()
-        .cloned()
-        .map(|genome| (compute_individual(&genome, ctx).fitness, genome))
-        .collect();
-    ranked.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-    let mut mixed: Vec<Genome> = ranked
-        .into_iter()
-        .take(keep_count.min(current_population.len()))
-        .map(|(_, genome)| genome)
-        .collect();
-
-    let missing = pop_size.saturating_sub(mixed.len());
-    if missing > 0 {
-        let random_population: Population<Genome> = build_population()
-            .with_genome_builder(RandomGenomeBuilder::new(Arc::clone(ctx)))
-            .of_size(missing)
-            .using_seed(seed);
-        mixed.extend(random_population.individuals().iter().cloned());
-    }
-
-    Population::with_individuals(mixed)
 }
