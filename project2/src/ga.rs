@@ -34,7 +34,7 @@ pub fn run_ga(
     let mut generations_without_improvement = 0u64;
     let generations_without_improvement_shared = Arc::new(Mutex::new(0u64));
     let mut history: Vec<plot::HistoryPoint> = Vec::new();
-    let mut current_population = initial_population;
+    let mut current_population = Some(initial_population);
     let mut generation_offset: u64 = 0;
     let mut restart_counter: u64 = 0;
     let mut should_stop = false;
@@ -57,6 +57,10 @@ pub fn run_ga(
         );
         let mutation_op_ref = mutation_op.clone();
 
+        let phase_population = current_population
+            .take()
+            .expect("current population should be available at phase start");
+
         let mut sim = simulate(
             genetic_algorithm()
                 .with_evaluation(fitness_fn.clone())
@@ -74,7 +78,7 @@ pub fn run_ga(
                     false,
                     cfg.reinsertion_ratio,
                 ))
-                .with_initial_population(current_population.clone())
+                .with_initial_population(phase_population)
                 .build(),
         )
         .until(GenerationLimit::new(remaining_generations))
@@ -174,13 +178,13 @@ pub fn run_ga(
                         let _ = std::io::stdout().flush();
 
                         let replacement_seed = derive_seed(&run_seed, restart_counter + 1);
-                        current_population = refresh_population(
+                        current_population = Some(refresh_population(
                             &population_genomes,
                             ctx,
                             cfg.pop_size,
                             cfg.stagnation_replace_ratio,
                             replacement_seed,
-                        );
+                        ));
 
                         generations_without_improvement = 0;
                         *generations_without_improvement_shared.lock().unwrap() = 0;
@@ -238,7 +242,7 @@ pub fn run_ga(
     }
 }
 
-// ── Seed utilities ────────────────────────────────────────────────────────
+// Seed utilities
 
 fn derive_seed(base_seed: &genevo::random::Seed, salt: u64) -> genevo::random::Seed {
     let mut derived = *base_seed;
