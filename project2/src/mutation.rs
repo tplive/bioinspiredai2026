@@ -30,7 +30,7 @@ pub enum MutationType {
 // When the population stagnates (100-179 generations without improvement),
 // hill climbing is applied instead of normal mutation to help escape local optima.
 #[derive(Clone, Debug)]
-pub struct NurseMutation {
+pub struct GenomeMutation {
     // Shared, mutable mutation rate that can be updated by the GA loop.
     pub mutation_rate: Arc<Mutex<f64>>,
     pub mutation_type: MutationType,
@@ -41,7 +41,7 @@ pub struct NurseMutation {
     pub hill_climb_steps: usize,
 }
 
-impl NurseMutation {
+impl GenomeMutation {
     pub fn new(
         initial_mutation_rate: f64,
         mutation_type: MutationType,
@@ -59,13 +59,13 @@ impl NurseMutation {
     }
 }
 
-impl GeneticOperator for NurseMutation {
+impl GeneticOperator for GenomeMutation {
     fn name() -> String {
         "Nurse-Scheduling-Mutation".to_string()
     }
 }
 
-impl MutationOp<Genome> for NurseMutation {
+impl MutationOp<Genome> for GenomeMutation {
     fn mutate<R>(&self, mut genome: Genome, rng: &mut R) -> Genome
     where
         R: Rng + Sized,
@@ -270,7 +270,7 @@ fn genome_hamming_distance(genome1: &Genome, genome2: &Genome) -> f64 {
 
 // Update the mutation rate based on population diversity.
 pub fn update_mutation_rate(
-    mutation_op: &NurseMutation,
+    mutation_op: &GenomeMutation,
     population_diversity: f64,
     baseline_rate: f64,
 ) {
