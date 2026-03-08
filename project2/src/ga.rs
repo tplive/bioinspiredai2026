@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::Config;
 use crate::crossover::RouteCrossover;
 use crate::fitness::{Genome, RouteFitness, compute_individual};
-use crate::mutation::{MutationType, GenomeMutation};
+use crate::mutation::{GenomeMutation, MutationType};
 use crate::plot;
 use crate::population::refresh_population;
 use crate::types::ProblemContext;
@@ -174,7 +174,6 @@ pub fn run_ga(
                             }
                             let _ = std::io::stdout().flush();
                         }
-
                     }
 
                     if cfg.stagnation_replace_after > 0
@@ -237,7 +236,7 @@ pub fn run_ga(
                     if best_genome.is_none() {
                         best_genome = Some(step.result.best_solution.solution.genome.clone());
                     }
-                    
+
                     // Only print phase stop reason for debugging, not as final status
                     let _ = (stop_reason, processing_time, duration);
                     break 'sim;
@@ -257,13 +256,15 @@ pub fn run_ga(
     }
 
     // Print completion status
-    if !cfg.quiet
-        && !should_stop && generation_offset >= cfg.generations as u64 {
-            println!();
-            println!("{:-<60}", "");
-            println!("Simulation completed: reached maximum generations limit ({})", cfg.generations);
-            println!("Best fitness found in generation {best_generation}");
-        }
+    if !cfg.quiet && !should_stop && generation_offset >= cfg.generations as u64 {
+        println!();
+        println!("{:-<60}", "");
+        println!(
+            "Simulation completed: reached maximum generations limit ({})",
+            cfg.generations
+        );
+        println!("Best fitness found in generation {best_generation}");
+    }
 
     GaResults {
         best_genome,
