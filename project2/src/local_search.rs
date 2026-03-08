@@ -90,8 +90,6 @@ fn two_opt_endpoints(route: &[usize], i: usize, j: usize) -> (usize, usize, usiz
 ///   - Pick a random route
 ///   - Swap two random patients in that route
 ///   - If fitness improves, keep the mutation
-///
-/// This matches the Julia implementation's hill_climb behavior.
 pub fn hill_climb<R: Rng>(genome: &Genome, ctx: &ProblemContext, max_steps: usize, rng: &mut R) -> Genome {
     let mut best_genome = genome.clone();
     let mut best_fitness = compute_individual(&best_genome, ctx).fitness;

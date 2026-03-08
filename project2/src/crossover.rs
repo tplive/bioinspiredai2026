@@ -8,16 +8,15 @@ use genevo::random::Rng;
 use crate::fitness::{compute_route, Genome};
 use crate::types::ProblemContext;
 
-// ── Main operator struct ──────────────────────────────────────────────────────
+// Main operator struct
 
-/// Route-based crossover for the nurse scheduling VRP.
+/// Route-based crossover
 ///
 /// For each parent pair:
 /// 1. Pick a "donor route" from parent-2 and remove those patients from parent-1.
 /// 2. Greedily re-insert the orphaned patients into the fittest position in parent-1.
 /// 3. Repeat in the other direction to produce the second child.
 ///
-/// Mirrors the Julia `crossover_population` / `insert_orphans` logic.
 #[derive(Clone, Debug)]
 pub struct RouteCrossover {
     pub ctx: Arc<ProblemContext>,
@@ -62,7 +61,7 @@ impl CrossoverOp<Genome> for RouteCrossover {
     }
 }
 
-// ── Crossover logic ───────────────────────────────────────────────────────────
+// Crossover logic
 
 /// Produce two offspring from two parents.
 fn crossover_pair<R: Rng + Sized>(
@@ -220,7 +219,7 @@ fn insert_orphans<R: Rng + Sized>(
 
             // Proximity bonus: if any patient in the route is geographically
             // close to the orphan (within 20% of average inter-patient distance),
-            // halve the effective distance (mirrors Julia's cluster bonus).
+            // halve the effective distance.
             let close_threshold = 10.0; // rough geographic unit threshold
             let has_nearby = route.iter().any(|&pid| {
                 let dx = patients[pid].x - patients[orphan].x;
