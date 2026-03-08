@@ -31,8 +31,8 @@ tournament_size  = 5            # default is 3
 selection_ratio  = 0.85         # fraction of population forwarded to parent pool
 crossover_rate   = 0.2         # probability crossover is applied per parent pair
 mutation_rate    = 0.80         # probability an individual is mutated
-mutation_type    = "insert"     # Intra-route mutation operator: "swap" or "insert"
-reinsertion_ratio = 0.2        # fraction of offspring in the next generation
+mutation_type    = "swap"     # Intra-route mutation operator: "swap" or "insert"
+reinsertion_ratio = 0.0        # fraction of offspring in the next generation
 
 # Replace part of the population if no improvement occurs for N generations.
 stagnation_replace_after = 179     # Replace part of the population if no improvement occurs for N generations.
