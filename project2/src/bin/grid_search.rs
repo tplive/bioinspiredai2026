@@ -115,6 +115,54 @@ fn generate_param_grid() -> Vec<HyperParams> {
     grid
 }
 
+fn print_hyperparameter_ranges(param_grid: &[HyperParams]) {
+    use std::collections::BTreeSet;
+    
+    // Extract unique values for each hyperparameter
+    let pop_sizes: BTreeSet<_> = param_grid.iter().map(|p| p.pop_size).collect();
+    let selection_ratios: BTreeSet<_> = param_grid.iter().map(|p| {
+        (p.selection_ratio * 100.0).round() as i32
+    }).collect();
+    let crossover_rates: BTreeSet<_> = param_grid.iter().map(|p| {
+        (p.crossover_rate * 100.0).round() as i32
+    }).collect();
+    let mutation_rates: BTreeSet<_> = param_grid.iter().map(|p| {
+        (p.mutation_rate * 100.0).round() as i32
+    }).collect();
+    let mutation_types: BTreeSet<_> = param_grid.iter().map(|p| p.mutation_type.as_str()).collect();
+    let tournament_sizes: BTreeSet<_> = param_grid.iter().map(|p| p.tournament_size).collect();
+    let reinsertion_ratios: BTreeSet<_> = param_grid.iter().map(|p| {
+        (p.reinsertion_ratio * 100.0).round() as i32
+    }).collect();
+    let inits: BTreeSet<_> = param_grid.iter().map(|p| p.init.as_str()).collect();
+    
+    // Format as strings
+    let format_int_set = |set: &BTreeSet<usize>| -> String {
+        let vals: Vec<_> = set.iter().map(|v| v.to_string()).collect();
+        format!("[{}]", vals.join(", "))
+    };
+    
+    let format_float_set = |set: &BTreeSet<i32>| -> String {
+        let vals: Vec<_> = set.iter().map(|v| format!("{:.2}", *v as f64 / 100.0)).collect();
+        format!("[{}]", vals.join(", "))
+    };
+    
+    let format_str_set = |set: &BTreeSet<&str>| -> String {
+        let vals: Vec<_> = set.iter().copied().collect();
+        format!("[{}]", vals.join(", "))
+    };
+    
+    println!("Hyperparameter Grid:");
+    println!("  pop_size:          {}", format_int_set(&pop_sizes));
+    println!("  selection_ratio:   {}", format_float_set(&selection_ratios));
+    println!("  crossover_rate:    {}", format_float_set(&crossover_rates));
+    println!("  mutation_rate:     {}", format_float_set(&mutation_rates));
+    println!("  mutation_type:     {}", format_str_set(&mutation_types));
+    println!("  tournament_size:   {}", format_int_set(&tournament_sizes));
+    println!("  reinsertion_ratio: {}", format_float_set(&reinsertion_ratios));
+    println!("  init:              {}", format_str_set(&inits));
+}
+
 fn evaluate_config(
     params: &HyperParams,
     problem_file: &str,
@@ -229,9 +277,7 @@ fn main() {
 
     // Problem files to evaluate
     let problem_files = vec![
-        "test_instances/test_instance_1.json",
-        "test_instances/test_instance_2.json",
-        "test_instances/test_instance_3.json",
+        "train/train_5.json",
     ];
 
     // Generate parameter grid
@@ -248,15 +294,7 @@ fn main() {
     println!("  Generations per run:   500");
     println!("  Parallel execution:    Enabled");
     println!();
-    println!("Hyperparameter Grid:");
-    println!("  pop_size:          [100, 150]");
-    println!("  selection_ratio:   [0.75, 0.85]");
-    println!("  crossover_rate:    [0.8, 0.9]");
-    println!("  mutation_rate:     [0.08, 0.12]");
-    println!("  mutation_type:     [swap, insert]");
-    println!("  tournament_size:   [2, 3]");
-    println!("  reinsertion_ratio: [0.8, 0.9]");
-    println!("  init:              [random, nn, cw]");
+    print_hyperparameter_ranges(&param_grid);
     println!("─────────────────────────────────────────────────────────────────");
     println!();
 
