@@ -33,16 +33,34 @@ Each GenomeBuilder implementation has the genomes placed in a context struct whi
 ### Population initialization
 There are four different methods available; `random`, `nn`, `cw` and `kmeans`.
 
-- **Random** will create a population with a shuffled list of patients, then divide them equally among the nurses.
-- **Nearest Neighbor (nn)** will start by assigning a random patient to each nurse, then calculating the distance to other patients, place the nearest neighbors in each patient list. The order of the nearest neighbors is not optimal in this case.
-- **Clarke-Wright (cw)** is an algorithm I came across on the Internet while researching possible optimizations improvements. 
+#### **Random** 
+Will create a population with a shuffled list of patients, then divide them equally among the nurses.
 
+#### **Nearest Neighbor (nn)** 
+Will start by assigning a random patient to each nurse, then calculating the distance to other patients, place the nearest neighbors in each patient list. The order of the nearest neighbors is not optimal in this case.
 
+#### **Clarke-Wright savings algorithm (cw)**
+This is an algorithm I came across on the Internet while researching possible optimizations improvements, see [1]. I used copilot to suggest a Rust implementation as a separate GenomeBuilder, and then implemented this as a configuration option in my solution.
+
+The algorithm works by calculating "savings" $s(i, j)$ for every pair $(i, j)$ of patients where $s(i, j) is a function of the distance between i and j and $D$ is the depot.
+
+$$s(i, j) = d(D, i) + d(D, j) - d(i, j)$$
+
+Then savings are ranked in descending order and route assignment is done such that no constraints are exceeded.
+
+#### **Kmeans clustering (kmeans)**
+This method attempts to create an optimal number of clusters and then assigning patients in the same cluster to the same routes.
+
+### 
 ## Experimental setup
+For experiments
 
 ## Results of experiments
 
 ## Findings and conclusions
+
+## References
+[1] https://web.mit.edu/urban_or_book/www/book/chapter6/6.4.12.html
 
 
 # TODOS - REMOVE BEFORE SUBMISSION!!!
@@ -102,3 +120,4 @@ value, you will get 6.66 points (full score).
 A plot and a solution text output for the best solution your GA finds must be shown for each
 of the test instances. The next section describes the expected format of the plot and solution
 output.
+

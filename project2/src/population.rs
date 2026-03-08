@@ -37,7 +37,7 @@ impl GenomeBuilder<Genome> for RandomGenomeBuilder {
 // Clarke-Wright Savings genome builder
 // -because I thought it could be a good fit..
 
-// https://www.kaggle.com/code/mayanksethia/clark-wright-savings-algorithm
+// https://web.mit.edu/urban_or_book/www/book/chapter6/6.4.12.html
 /// Builds genomes using the Clarke-Wright Savings algorithm.
 pub struct ClarkeWrightGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
