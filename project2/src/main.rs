@@ -139,6 +139,7 @@ impl Cli {
             stagnation_replace_after: self.stagnation_replace_after,
             stagnation_replace_ratio: self.stagnation_replace_ratio,
             hill_climb_steps: self.hill_climb_steps,
+            quiet: None, // Normal runs are not quiet by default
         }
     }
 }

@@ -46,6 +46,8 @@ pub struct Config {
     pub stagnation_replace_ratio: f64,
     /// Number of hill climbing steps to apply when stagnating (100-179 gens without improvement).
     pub hill_climb_steps: usize,
+    /// Suppress generation-by-generation output (for batch/grid search).
+    pub quiet: bool,
 }
 
 impl Default for Config {
@@ -68,6 +70,7 @@ impl Default for Config {
             stagnation_replace_after: 180,
             stagnation_replace_ratio: 0.90,
             hill_climb_steps: 10,
+            quiet: false,
         }
     }
 }
@@ -98,6 +101,7 @@ pub struct PartialConfig {
     pub stagnation_replace_after: Option<usize>,
     pub hill_climb_steps: Option<usize>,
     pub stagnation_replace_ratio: Option<f64>,
+    pub quiet: Option<bool>,
 }
 
 impl PartialConfig {
@@ -120,6 +124,7 @@ impl PartialConfig {
         if let Some(v) = self.stagnation_replace_after { base.stagnation_replace_after = v; }
         if let Some(v) = self.stagnation_replace_ratio { base.stagnation_replace_ratio = v; }
         if let Some(v) = self.hill_climb_steps   { base.hill_climb_steps = v; }
+        if let Some(v) = self.quiet              { base.quiet = v; }
         base
     }
 }

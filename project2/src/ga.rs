@@ -43,8 +43,10 @@ pub fn run_ga(
     let mut restart_counter: u64 = 0;
     let mut should_stop = false;
 
-    println!("Running genetic algorithm...");
-    println!("{:-<60}", "");
+    if !cfg.quiet {
+        println!("Running genetic algorithm...");
+        println!("{:-<60}", "");
+    }
 
     'run: while generation_offset < cfg.generations as u64 {
         let remaining_generations = cfg.generations as u64 - generation_offset;
@@ -143,39 +145,45 @@ pub fn run_ga(
                         };
 
                         let current_mutation_rate = *mutation_op_ref.mutation_rate.lock().unwrap();
-                        println!(
-                            "\nGen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
-                            global_generation,
-                            ind.fitness,
-                            cost_delta,
-                            ind.total_travel,
-                            ind.total_penalty,
-                            current_mutation_rate,
-                            current_diversity,
-                            if ind.feasible { "" } else { "NOT " },
-                            if ind.feasible { "" } else { "  " },
-                            pct_diff,
-                        );
+                        if !cfg.quiet {
+                            println!(
+                                "\nGen {:>4} | cost: {:>10.2} ({:+9.2}) | travel: {:>8.2} | penalty: {:>9.2} | mut: {:>6.4} | div: {:>5.3} | {}feasible{} | travel {:.2}% vs benchmark",
+                                global_generation,
+                                ind.fitness,
+                                cost_delta,
+                                ind.total_travel,
+                                ind.total_penalty,
+                                current_mutation_rate,
+                                current_diversity,
+                                if ind.feasible { "" } else { "NOT " },
+                                if ind.feasible { "" } else { "  " },
+                                pct_diff,
+                            );
+                        }
                     } else {
                         generations_without_improvement += 1;
                         *generations_without_improvement_shared.lock().unwrap() =
                             generations_without_improvement;
 
                         // Print visual indicator for hill climbing activation
-                        if (100..180).contains(&generations_without_improvement) {
-                            print!("h"); // Say "h" for "hill" when doing hill climbing
-                        } else {
-                            print!(".");
+                        if !cfg.quiet {
+                            if (100..180).contains(&generations_without_improvement) {
+                                print!("h"); // Say "h" for "hill" when doing hill climbing
+                            } else {
+                                print!(".");
+                            }
+                            let _ = std::io::stdout().flush();
                         }
-                        let _ = std::io::stdout().flush();
 
                     }
 
                     if cfg.stagnation_replace_after > 0
                         && generations_without_improvement >= cfg.stagnation_replace_after as u64
                     {
-                        print!(":");
-                        let _ = std::io::stdout().flush();
+                        if !cfg.quiet {
+                            print!(":");
+                            let _ = std::io::stdout().flush();
+                        }
 
                         let replacement_seed = derive_seed(&run_seed, restart_counter + 1);
                         current_population = Some(refresh_population(
@@ -190,10 +198,12 @@ pub fn run_ga(
                         *generations_without_improvement_shared.lock().unwrap() = 0;
                         generation_offset = global_generation;
                         restart_counter += 1;
-                        println!(
-                            "\nPopulation refresh at generation {} (replace ratio {:.2})",
-                            global_generation, cfg.stagnation_replace_ratio
-                        );
+                        if !cfg.quiet {
+                            println!(
+                                "\nPopulation refresh at generation {} (replace ratio {:.2})",
+                                global_generation, cfg.stagnation_replace_ratio
+                            );
+                        }
                         continue 'run;
                     }
 
@@ -201,12 +211,14 @@ pub fn run_ga(
                     if best_feasible
                         && total_generations_without_feasible_improvement >= EARLY_STOP_GENERATIONS
                     {
-                        println!();
-                        println!("{:-<60}", "");
-                        println!(
-                            "Early stopping: No feasible improvement for {} generations",
-                            total_generations_without_feasible_improvement
-                        );
+                        if !cfg.quiet {
+                            println!();
+                            println!("{:-<60}", "");
+                            println!(
+                                "Early stopping: No feasible improvement for {} generations",
+                                total_generations_without_feasible_improvement
+                            );
+                        }
                         should_stop = true;
                         break 'sim;
                     }
@@ -245,11 +257,13 @@ pub fn run_ga(
     }
 
     // Print completion status
-    if !should_stop && generation_offset >= cfg.generations as u64 {
-        println!();
-        println!("{:-<60}", "");
-        println!("Simulation completed: reached maximum generations limit ({})", cfg.generations);
-        println!("Best fitness found in generation {best_generation}");
+    if !cfg.quiet {
+        if !should_stop && generation_offset >= cfg.generations as u64 {
+            println!();
+            println!("{:-<60}", "");
+            println!("Simulation completed: reached maximum generations limit ({})", cfg.generations);
+            println!("Best fitness found in generation {best_generation}");
+        }
     }
 
     GaResults {
