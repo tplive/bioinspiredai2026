@@ -20,26 +20,26 @@ plot = false
 # "nn"     = nearest-neighbour
 # "cw"     = Clarke-Wright 
 # "kmeans" = kmeans clustering, trying for one cluster per nurse or patient, whichever is fewer 
-init = "kmeans"
+init = "nn"
 
 # Hyperparameters
-pop_size         = 50          # number of individuals
+pop_size         = 300          # number of individuals
 generations      = 5000        # stopping criterion. Will stop earlier, after 1000 generations without improvement.
 
 selection_type   = "tournament" # "tournament" or "truncation"
 tournament_size  = 5            # default is 3
-selection_ratio  = 0.80         # fraction of population forwarded to parent pool
-crossover_rate   = 0.55         # probability crossover is applied per parent pair
+selection_ratio  = 0.85         # fraction of population forwarded to parent pool
+crossover_rate   = 0.2         # probability crossover is applied per parent pair
 mutation_rate    = 0.80         # probability an individual is mutated
-mutation_type    = "swap"     # Intra-route mutation operator: "swap" or "insert"
-reinsertion_ratio = 0.85        # fraction of offspring in the next generation
+mutation_type    = "insert"     # Intra-route mutation operator: "swap" or "insert"
+reinsertion_ratio = 0.2        # fraction of offspring in the next generation
 
 # Replace part of the population if no improvement occurs for N generations.
 stagnation_replace_after = 179     # Replace part of the population if no improvement occurs for N generations.
-stagnation_replace_ratio = 0.70    # % of population to replace
+stagnation_replace_ratio = 0.90    # % of population to replace
 
 # Number of hill climbing steps to apply when stagnating (100-179 gens without improvement).
-hill_climb_steps = 30
+hill_climb_steps = 10
 
 # Fitness
 penalty_factor   = 100.0         # multiplier per unit of constraint violation

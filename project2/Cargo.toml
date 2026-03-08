@@ -11,4 +11,20 @@ clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 plotters = "0.3"
-rayon = "1.7"
+rayon = "1.10"
+
+[[bin]]
+name = "project2"
+path = "src/main.rs"
+
+[[bin]]
+name = "grid_search"
+path = "src/bin/grid_search.rs"
+
+[[bin]]
+name = "grid_search_test"
+path = "src/bin/grid_search_test.rs"
+
+[lib]
+name = "project2"
+path = "src/lib.rs"
