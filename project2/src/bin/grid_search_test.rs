@@ -91,7 +91,16 @@ fn evaluate_config(
     };
 
     let mutation_op_type = MutationType::Swap;
-    let results = ga::run_ga(&cfg, &ctx, initial_population, run_seed, mutation_op_type);
+    
+    // Call run_ga with appropriate genome builder for refresh
+    let results = match cfg.init.as_str() {
+        "nn" => ga::run_ga(&cfg, &ctx, initial_population, 
+            NearestNeighbourGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+        "cw" => ga::run_ga(&cfg, &ctx, initial_population, 
+            ClarkeWrightGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+        _ => ga::run_ga(&cfg, &ctx, initial_population, 
+            RandomGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+    };
 
     let best_genome = results.best_genome.expect("No best genome found");
     let best_ind = project2::fitness::compute_individual(&best_genome, &ctx);

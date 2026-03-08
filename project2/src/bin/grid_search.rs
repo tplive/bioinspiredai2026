@@ -223,14 +223,17 @@ fn evaluate_config(
         _ => MutationType::Swap,
     };
 
-    // Run GA (now with quiet mode enabled)
-    let results = ga::run_ga(
-        &cfg,
-        &ctx,
-        initial_population,
-        run_seed,
-        mutation_op_type,
-    );
+    // Run GA with appropriate genome builder for refresh
+    let results = match cfg.init.as_str() {
+        "nn" => ga::run_ga(&cfg, &ctx, initial_population, 
+            NearestNeighbourGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+        "cw" => ga::run_ga(&cfg, &ctx, initial_population, 
+            ClarkeWrightGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+        "kmeans" => ga::run_ga(&cfg, &ctx, initial_population, 
+            KMeansGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+        _ => ga::run_ga(&cfg, &ctx, initial_population, 
+            RandomGenomeBuilder::new(ctx.clone()), run_seed, mutation_op_type),
+    };
 
     // Extract best result
     let best_genome = results.best_genome.expect("No best genome found");

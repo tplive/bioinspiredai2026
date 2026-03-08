@@ -258,7 +258,19 @@ fn main() {
     // #### THE RUNNING OF THE ALGORITHM ####
     // ######################################
     let now = Instant::now();
-    let ga_results = ga::run_ga(&cfg, &ctx, initial_population, run_seed, mutation_op_type);
+    
+    // Create genome builder based on init method for use in population refresh
+    let ga_results = match cfg.init.as_str() {
+        "nn" => ga::run_ga(&cfg, &ctx, initial_population, 
+            NearestNeighbourGenomeBuilder::new(Arc::clone(&ctx)), run_seed, mutation_op_type),
+        "cw" => ga::run_ga(&cfg, &ctx, initial_population, 
+            ClarkeWrightGenomeBuilder::new(Arc::clone(&ctx)), run_seed, mutation_op_type),
+        "kmeans" => ga::run_ga(&cfg, &ctx, initial_population, 
+            KMeansGenomeBuilder::new(Arc::clone(&ctx)), run_seed, mutation_op_type),
+        _ => ga::run_ga(&cfg, &ctx, initial_population, 
+            RandomGenomeBuilder::new(Arc::clone(&ctx)), run_seed, mutation_op_type),
+    };
+    
     println!("The running took {:?}", Instant::now() - now);
 
     let best_genome = ga_results.best_genome;

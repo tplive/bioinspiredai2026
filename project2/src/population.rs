@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 /// Builds random genomes by shuffling all patient IDs and distributing them
 /// evenly across nurses.
+#[derive(Clone)]
 pub struct RandomGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -39,6 +40,7 @@ impl GenomeBuilder<Genome> for RandomGenomeBuilder {
 
 // https://web.mit.edu/urban_or_book/www/book/chapter6/6.4.12.html
 /// Builds genomes using the Clarke-Wright Savings algorithm.
+#[derive(Clone)]
 pub struct ClarkeWrightGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -168,6 +170,7 @@ impl GenomeBuilder<Genome> for ClarkeWrightGenomeBuilder {
 /// Builds genomes using a simple nearest-neighbour heuristic:
 /// each nurse starts at a random patient and greedily visits the
 /// nearest unvisited patient until the route reaches `route_length`.
+#[derive(Clone)]
 pub struct NearestNeighbourGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -248,6 +251,7 @@ impl GenomeBuilder<Genome> for NearestNeighbourGenomeBuilder {
 /// then using each cluster as a nurse route.
 /// Assumes that the travel times are somewhat coherent between the coordinates.
 /// and for good results, coordinates must be clusterable..
+#[derive(Clone)]
 pub struct KMeansGenomeBuilder {
     pub ctx: Arc<ProblemContext>,
 }
@@ -542,21 +546,26 @@ fn balance_routes(mut routes: Vec<Vec<usize>>, num_nurses: usize) -> Genome {
 
 //Population refresh
 /// Refreshes the population by keeping the best individuals and replacing the rest
-/// with newly generated random individuals.
+/// with newly generated individuals using the provided genome builder.
 ///
 /// # Arguments
 /// * `current_population` - The current population to refresh
 /// * `ctx` - Problem context
 /// * `pop_size` - Target population size
 /// * `replace_ratio` - Fraction of population to replace (0.0 to 1.0)
+/// * `genome_builder` - The genome builder to use for new individuals
 /// * `seed` - Random seed for generating new individuals
-pub fn refresh_population(
+pub fn refresh_population<B>(
     current_population: &[Genome],
     ctx: &Arc<ProblemContext>,
     pop_size: usize,
     replace_ratio: f64,
+    genome_builder: B,
     seed: Seed,
-) -> Population<Genome> {
+) -> Population<Genome>
+where
+    B: GenomeBuilder<Genome>,
+{
     let bounded_ratio = replace_ratio.clamp(0.0, 1.0);
     let replace_count = ((pop_size as f64) * bounded_ratio).round() as usize;
     let replace_count = replace_count.min(pop_size);
@@ -577,11 +586,11 @@ pub fn refresh_population(
 
     let missing = pop_size.saturating_sub(mixed.len());
     if missing > 0 {
-        let random_population: Population<Genome> = build_population()
-            .with_genome_builder(RandomGenomeBuilder::new(Arc::clone(ctx)))
+        let new_population: Population<Genome> = build_population()
+            .with_genome_builder(genome_builder)
             .of_size(missing)
             .using_seed(seed);
-        mixed.extend(random_population.individuals().iter().cloned());
+        mixed.extend(new_population.individuals().iter().cloned());
     }
 
     Population::with_individuals(mixed)

@@ -20,13 +20,17 @@ pub struct GaResults {
 }
 
 /// Run the genetic algorithm with the given configuration and initial population
-pub fn run_ga(
+pub fn run_ga<B>(
     cfg: &Config,
     ctx: &Arc<ProblemContext>,
     initial_population: Population<Genome>,
+    genome_builder: B,
     run_seed: genevo::random::Seed,
     mutation_op_type: MutationType,
-) -> GaResults {
+) -> GaResults
+where
+    B: genevo::population::GenomeBuilder<Genome> + Clone,
+{
     let mut best_genome: Option<Genome> = None;
     let mut best_fitness = i64::MIN;
     let mut best_generation: u64 = 0;
@@ -190,6 +194,7 @@ pub fn run_ga(
                             ctx,
                             cfg.pop_size,
                             cfg.stagnation_replace_ratio,
+                            genome_builder.clone(),
                             replacement_seed,
                         ));
 
