@@ -1,0 +1,17 @@
+file = "test_instances/test_instance_2.json"
+pop_size = 200
+generations = 6000
+selection_ratio = 0.8
+crossover_rate = 0.65
+mutation_rate = 0.6
+mutation_type = "insert"
+reinsertion_ratio = 0.85
+penalty_factor = 10.0
+init = "kmeans"
+selection_type = "tournament"
+tournament_size = 5
+plot = true
+random_seed = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+stagnation_replace_after = 180
+stagnation_replace_ratio = 0.9
+hill_climb_steps = 10
