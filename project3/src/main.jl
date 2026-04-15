@@ -6,6 +6,7 @@ include("feature_landscape.jl")
 include("triangle_landscape.jl")
 include("sga.jl")
 include("nsga2.jl")
+include("ant_colony.jl")
 
 function ensure_dir(path::AbstractString)
     isdir(path) || mkpath(path)
@@ -129,10 +130,12 @@ function resolve_optimizer(name::AbstractString)
     normalized = lowercase(strip(name))
     if normalized == "sga"
         return run_sga
+    elseif normalized == "aco"
+        return run_aco
     elseif normalized in ("nsga2", "nsga-ii", "nsga_ii")
         return run_nsga2
     else
-        error("Unsupported optimizer=$(name). Use 'sga' or 'nsga2'.")
+        error("Unsupported optimizer=$(name). Use 'sga', 'aco', or 'nsga2'.")
     end
 end
 
@@ -165,13 +168,7 @@ function main()
     )
 
     sga_config = haskey(config, "sga") ? config["sga"] : Dict{String, Any}()
-    params = SGAParams(
-        population_size=Int(get_config_value(sga_config, "population_size", 120)),
-        generations=Int(get_config_value(sga_config, "generations", 150)),
-        tournament_size=Int(get_config_value(sga_config, "tournament_size", 3)),
-        crossover_rate=Float64(get_config_value(sga_config, "crossover_rate", 0.85)),
-        mutation_rate=Float64(get_config_value(sga_config, "mutation_rate", 0.02)),
-    )
+    aco_config = haskey(config, "aco") ? config["aco"] : Dict{String, Any}()
 
     seeds = if haskey(config, "seeds")
         to_int_vector(config["seeds"])
@@ -182,6 +179,29 @@ function main()
     end
 
     run_optimizer = resolve_optimizer(optimizer_name)
+
+    params = if lowercase(strip(optimizer_name)) == "aco"
+        ACOParams(
+            ant_count=Int(get_config_value(aco_config, "ant_count", get_config_value(aco_config, "population_size", 120))),
+            iterations=Int(get_config_value(aco_config, "iterations", get_config_value(aco_config, "generations", 150))),
+            evaporation_rate=Float64(get_config_value(aco_config, "evaporation_rate", 0.25)),
+            alpha=Float64(get_config_value(aco_config, "alpha", 1.0)),
+            beta=Float64(get_config_value(aco_config, "beta", 2.0)),
+            elite_count=Int(get_config_value(aco_config, "elite_count", 5)),
+            deposit_weight=Float64(get_config_value(aco_config, "deposit_weight", 1.0)),
+            initial_pheromone=Float64(get_config_value(aco_config, "initial_pheromone", 0.5)),
+            min_pheromone=Float64(get_config_value(aco_config, "min_pheromone", 0.05)),
+            max_pheromone=Float64(get_config_value(aco_config, "max_pheromone", 0.95)),
+        )
+    else
+        SGAParams(
+            population_size=Int(get_config_value(sga_config, "population_size", 120)),
+            generations=Int(get_config_value(sga_config, "generations", 150)),
+            tournament_size=Int(get_config_value(sga_config, "tournament_size", 3)),
+            crossover_rate=Float64(get_config_value(sga_config, "crossover_rate", 0.85)),
+            mutation_rate=Float64(get_config_value(sga_config, "mutation_rate", 0.02)),
+        )
+    end
 
     if landscape_mode == :feature
         landscape = load_feature_landscape(

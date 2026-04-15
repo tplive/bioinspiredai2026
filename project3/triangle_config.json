@@ -1,6 +1,7 @@
 {
   "landscape_mode": "triangle",
-  "out_dir": "artifacts/triangle_n16_m1_s4",
+  "optimizer": "aco",
+  "out_dir": "artifacts/triangle_n8_m1_s2_aco",
   "strict_local_optima": true,
   "run_visualization": true,
   "plot_optima": true,
@@ -13,6 +14,19 @@
     "tournament_size": 3,
     "crossover_rate": 0.85,
     "mutation_rate": 0.02
+  },
+  "aco": {
+    "ant_count": 30,
+    "iterations": 100,
+    "evaporation_rate": 0.1,
+    "alpha": 1.0,
+    "beta": 2.0,
+    "elite_count": 3,
+    "deposit_weight": 1.0,
+    "initial_pheromone": 0.5,
+    "min_pheromone": 0.01,
+    "max_pheromone": 1.0,
+    "enforce_non_empty": true
   },
   "triangle": {
     "n": 8,
