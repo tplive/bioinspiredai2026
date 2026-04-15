@@ -71,12 +71,12 @@ function read_csv_local_optima(path::AbstractString)
         end
     end
 
-    isempty(points) && error("No local optima found in $(path)")
     return points
 end
 
 function infer_n_from_bitstrings(points::Vector{FitnessPoint}, optima::Vector{OptimumPoint})
     n1 = maximum(length(p.bitstring) for p in points)
+    isempty(optima) && return n1
     n2 = maximum(length(p.bitstring) for p in optima)
     n1 == n2 || error("Penalized fitness and local optima CSV files disagree on bitstring width")
     return n1
@@ -182,7 +182,8 @@ function write_surface_svg(path::AbstractString, surface::Matrix{Float64}, local
         println(io, "  <rect x=\"0\" y=\"0\" width=\"$(width)\" height=\"$(height)\" fill=\"url(#bg)\"/>")
 
         println(io, "  <text x=\"80\" y=\"48\" font-size=\"30\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#111827\">$(title)</text>")
-        println(io, "  <text x=\"80\" y=\"74\" font-size=\"15\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#334155\">Exact surface from penalized_fitness.csv; x maps to $(bit_range_label(1, nx)) and y maps to $(bit_range_label(nx + 1, nx + ny)); red diamonds mark strict local optima</text>")
+        optima_note = isempty(local_optima) ? "no optima markers shown" : "red diamonds mark plotted optima"
+        println(io, "  <text x=\"80\" y=\"74\" font-size=\"15\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#334155\">Exact surface from penalized_fitness.csv; x maps to $(bit_range_label(1, nx)) and y maps to $(bit_range_label(nx + 1, nx + ny)); $(optima_note)</text>")
 
         # Axes and scales.
         ox, oy = p_plane(0, 0)
@@ -280,7 +281,7 @@ function write_surface_svg(path::AbstractString, surface::Matrix{Float64}, local
         ly = 96
         println(io, "  <rect x=\"$(lx)\" y=\"$(ly)\" width=\"322\" height=\"150\" rx=\"12\" fill=\"#ffffff\" fill-opacity=\"0.92\" stroke=\"#cbd5e1\"/>")
         println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 26)\" font-size=\"13\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#1e293b\">Surface source: penalized_fitness.csv</text>")
-        println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 48)\" font-size=\"13\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#1e293b\">Red diamonds: strict local optima</text>")
+        println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 48)\" font-size=\"13\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#1e293b\">Red diamonds: $(length(local_optima)) plotted optima</text>")
         println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 64)\" font-size=\"13\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#1e293b\">labels: decimal + bitstring</text>")
         println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 84)\" font-size=\"12\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#334155\">x axis = $(bit_range_label(1, nx))</text>")
         println(io, "  <text x=\"$(lx + 14)\" y=\"$(ly + 104)\" font-size=\"12\" font-family=\"Avenir Next, Segoe UI, sans-serif\" fill=\"#334155\">y axis = $(bit_range_label(nx + 1, nx + ny))</text>")

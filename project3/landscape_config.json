@@ -6,6 +6,8 @@
   "out_dir": "artifacts/08_letter_r",
   "strict_local_optima": true,
   "run_visualization": true,
+  "plot_optima": true,
+  "plot_top_n_optima": 0,
   "seed_start": 1000,
   "seed_end": 1009,
   "sga": {

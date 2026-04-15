@@ -87,10 +87,9 @@ function write_penalized_fitness_csv(path::AbstractString, landscape::TriangleLa
     end
 end
 
-function run_visualization_script(project_root::AbstractString, out_dir::AbstractString)
+function run_visualization_script(project_root::AbstractString, out_dir::AbstractString, local_optima_csv::AbstractString)
     script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
     penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
-    local_optima_csv = joinpath(out_dir, "local_optima.csv")
     output_svg = joinpath(out_dir, "fitness_landscape_3d.svg")
 
     cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(penalized_csv) $(local_optima_csv) $(output_svg)`
@@ -111,6 +110,20 @@ function to_int_vector(values)
     [Int(v) for v in values]
 end
 
+function select_optima_for_plot(optima; plot_optima::Bool=true, plot_top_n_optima::Int=0)
+    if !plot_optima
+        return NamedTuple[]
+    end
+
+    if plot_top_n_optima <= 0
+        return optima
+    end
+
+    sorted_optima = sort(optima; by=o -> (-o.fitness, o.decimal))
+    keep_count = min(plot_top_n_optima, length(sorted_optima))
+    sorted_optima[1:keep_count]
+end
+
 function main()
     project_root = normpath(joinpath(@__DIR__, ".."))
 
@@ -126,6 +139,8 @@ function main()
     out_dir = resolve_path(project_root, String(get_config_value(config, "out_dir", "artifacts/08_letter_r")))
     strict_local_optima = Bool(get_config_value(config, "strict_local_optima", true))
     run_visualization = Bool(get_config_value(config, "run_visualization", true))
+    plot_optima = Bool(get_config_value(config, "plot_optima", true))
+    plot_top_n_optima = Int(get_config_value(config, "plot_top_n_optima", 0))
 
     triangle_config = haskey(config, "triangle") ? config["triangle"] : Dict{String, Any}()
     triangle_n = Int(get_config_value(triangle_config, "n", 16))
@@ -190,8 +205,19 @@ function main()
     mean_curve = [mean([r.best_so_far[g] for r in runs]) for g in 1:gen_count]
 
     ensure_dir(out_dir)
+    local_optima_path = joinpath(out_dir, "local_optima.csv")
+    local_optima_plot_path = joinpath(out_dir, "local_optima_plot.csv")
+
     write_runs_csv(joinpath(out_dir, "runs.csv"), runs)
-    write_optima_csv(joinpath(out_dir, "local_optima.csv"), optima)
+    write_optima_csv(local_optima_path, optima)
+
+    plot_optima_rows = select_optima_for_plot(
+        optima;
+        plot_optima=plot_optima,
+        plot_top_n_optima=plot_top_n_optima,
+    )
+    write_optima_csv(local_optima_plot_path, plot_optima_rows)
+
     write_convergence_csv(joinpath(out_dir, "convergence.csv"), mean_curve)
     write_penalized_fitness_csv(joinpath(out_dir, "penalized_fitness.csv"), landscape)
 
@@ -215,7 +241,12 @@ function main()
             println(io, "- states: $(1 << landscape.n)")
         end
         println(io, "- local optima (strict, Hamming-1): $(length(optima))")
+        println(io, "- optima plotted: $(length(plot_optima_rows))")
+        println(io, "- plot_optima: $(plot_optima)")
+        println(io, "- plot_top_n_optima: $(plot_top_n_optima)")
         println(io, "- full penalized fitness table: `$(joinpath(out_dir, "penalized_fitness.csv"))`")
+        println(io, "- full optima table: `$(local_optima_path)`")
+        println(io, "- plotted optima table: `$(local_optima_plot_path)`")
         @printf(io, "- best run fitness: %.8f\n", best_run.best_fitness)
         println(io, "- best run bitstring: `$(best_run.best_bitstring)`")
         @printf(io, "- mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
@@ -231,7 +262,7 @@ function main()
 
     if run_visualization
         println("Generating landscape plot...")
-        plot_path = run_visualization_script(project_root, out_dir)
+        plot_path = run_visualization_script(project_root, out_dir, local_optima_plot_path)
         println("Landscape plot written to $(plot_path)")
     else
         println("Skipping landscape plot generation (run_visualization=false)")

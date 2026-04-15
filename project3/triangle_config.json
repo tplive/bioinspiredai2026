@@ -3,6 +3,8 @@
   "out_dir": "artifacts/triangle_n16_m1_s4",
   "strict_local_optima": true,
   "run_visualization": true,
+  "plot_optima": true,
+  "plot_top_n_optima": 3,
   "seed_start": 1000,
   "seed_end": 1009,
   "sga": {
@@ -13,8 +15,8 @@
     "mutation_rate": 0.02
   },
   "triangle": {
-    "n": 16,
+    "n": 8,
     "m": 1,
-    "s": 4
+    "s": 2
   }
 }
