@@ -3,13 +3,54 @@ using Statistics
 
 struct FeatureLandscape
     values::Vector{Float64}
+    times::Vector{Float64}
     n::Int
     epsilon::Float64
+    time_penalty::Float64
     one_based_indexing::Bool
-    dataset_name::String
+    accuracy_dataset_name::String
+    times_dataset_name::String
 end
 
-function load_feature_landscape(path::AbstractString; epsilon::Float64=0.02)
+function read_h5_metric(path::AbstractString, dataset_name::String)
+
+    h5open(path, "r") do h5
+        raw = read(h5[dataset_name])
+        ndims(raw) == 1 && return vec(Float64.(raw))
+        ndims(raw) == 2 && return vec(mean(Float64.(raw), dims=2))
+        error("Unsupported dataset shape $(size(raw)) in $(path)")
+    end
+end
+
+"""Read the accuracies dataset as the base lookup table.
+
+If accuracies are stored as a 2D matrix (states x repeats/folds),
+this returns one value per state by taking the mean across columns.
+"""
+function read_accuracies_lookup(path::AbstractString, dataset_name::String)
+    h5open(path, "r") do h5
+        raw = read(h5[dataset_name])
+        if ndims(raw) == 1
+            return vec(Float64.(raw))
+        elseif ndims(raw) == 2
+            # Mean over columns -> one lookup fitness per state (row).
+            return vec(mean(Float64.(raw), dims=2))
+        end
+
+        error("Unsupported accuracies dataset shape $(size(raw)) in $(path)")
+    end
+end
+
+function normalize(v::Vector{Float64})
+    vmin = minimum(v)
+    vmax = maximum(v)
+    d = vmax - vmin # Delta of max and min
+    d <= eps(Float64) && return zeros(Float64, length(v)) # If delta < eps return vector of 0
+
+    (v .- vmin) ./ d # Else do matrix calc on vector
+end
+
+function load_feature_landscape(path::AbstractString; epsilon::Float64=0.02, time_penalty::Float64=0.10)
     dataset_names = String[]
 
     h5open(path, "r") do h5
@@ -20,19 +61,24 @@ function load_feature_landscape(path::AbstractString; epsilon::Float64=0.02)
 
     isempty(dataset_names) && error("No datasets found in $(path)")
 
-    preferred = findfirst(n -> occursin("accuracy", lowercase(n)), dataset_names)
-    dataset_name = isnothing(preferred) ? dataset_names[1] : dataset_names[preferred]
+    accuracies_index = findfirst(n -> occursin("accuracies", lowercase(n)), dataset_names)
+    times_index = findfirst(n -> occursin("times", lowercase(n)), dataset_names)
 
-    values = h5open(path, "r") do h5
-        raw = read(h5[dataset_name])
-        ndims(raw) == 1 && return vec(Float64.(raw))
-        ndims(raw) == 2 && return vec(mean(Float64.(raw), dims=2))
-        error("Unsupported dataset shape $(size(raw)) in $(path)")
-    end
+    isnothing(accuracies_index) && error("Could not find an accuracies dataset in $(path). Found: $(dataset_names)")
+    isnothing(times_index) && error("Could not find an times dataset in $(path). Found: $(dataset_names)")
+
+    accuracies_dataset_name = dataset_names[accuracies_index]
+    times_dataset_name = dataset_names[times_index]
+
+    values = read_accuracies_lookup(path, accuracies_dataset_name)
+    times_raw = read_h5_metric(path, times_dataset_name)
+
+    length(values) == length(times_raw) || error("Accuracy and times length mismatch: $(length(values)) vs $(length(times_raw))")
 
     n, one_based = infer_n_and_indexing(length(values))
+    times = normalize(times_raw)
 
-    FeatureLandscape(values, n, epsilon, one_based, dataset_name)
+    FeatureLandscape(values, times, n, epsilon, time_penalty, one_based, accuracies_dataset_name, times_dataset_name,)
 end
 
 function infer_n_and_indexing(len::Int)
@@ -80,8 +126,9 @@ function fitness_bits(landscape::FeatureLandscape, bits::AbstractVector{Bool})
     row = decimal_to_row(landscape, decimal)
     isnothing(row) && return -Inf
 
-    penalty = landscape.epsilon * count(identity, bits)
-    landscape.values[row] - penalty
+    feature_penalty = landscape.epsilon * count(identity, bits)
+    time_penalty = landscape.time_penalty * landscape.times[row]
+    landscape.values[row] - feature_penalty - time_penalty
 end
 
 function detect_local_optima(landscape::FeatureLandscape; strict::Bool=true)

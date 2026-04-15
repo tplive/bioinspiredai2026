@@ -35,10 +35,49 @@ function write_convergence_csv(path::AbstractString, mean_curve::Vector{Float64}
     end
 end
 
+function write_penalized_fitness_csv(path::AbstractString, landscape::FeatureLandscape)
+    open(path, "w") do io
+        println(io, "row,decimal,bitstring,accuracy,normalized_time,active_features,penalized_fitness")
+
+        for row in eachindex(landscape.values)
+            decimal = row_to_decimal(landscape, row)
+            bits = decimal_to_bits(decimal, landscape.n)
+            active_features = count(identity, bits)
+            penalized_fitness = fitness_bits(landscape, bits)
+
+            @printf(
+                io,
+                "%d,%d,%s,%.8f,%.8f,%d,%.8f\n",
+                row,
+                decimal,
+                String(join(Int.(bits))),
+                landscape.values[row],
+                landscape.times[row],
+                active_features,
+                penalized_fitness,
+            )
+        end
+    end
+end
+
+function run_visualization_script(project_root::AbstractString, out_dir::AbstractString)
+    script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
+    penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
+    local_optima_csv = joinpath(out_dir, "local_optima.csv")
+    output_svg = joinpath(out_dir, "fitness_landscape_3d.svg")
+
+    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(penalized_csv) $(local_optima_csv) $(output_svg)`
+    run(cmd)
+
+    output_svg
+end
+
 function main()
-    dataset_path = "train_data/01-breast-w_lr_F.h5"
+    project_root = normpath(joinpath(@__DIR__, ".."))
+    dataset_path = "train_data/08-letter-r_knn_F.h5"
     epsilon = 0.02
-    out_dir = "artifacts/mvp_01_breast_w"
+    time_penalty = 0.1
+    out_dir = "artifacts/08_letter_r"
 
     params = SGAParams(
         population_size=120,
@@ -48,8 +87,14 @@ function main()
         mutation_rate=0.02,
     )
 
-    landscape = load_feature_landscape(dataset_path; epsilon=epsilon)
-    println("Loaded dataset: $(landscape.dataset_name)")
+    landscape = load_feature_landscape(
+        dataset_path;
+        epsilon=epsilon,
+        time_penalty=time_penalty,
+    )
+    println("Loaded file: $(dataset_path)")
+    println("Accuracy dataset: $(landscape.accuracy_dataset_name)")
+    println("Times dataset: $(landscape.times_dataset_name)")
     println("States: $(length(landscape.values)), n=$(landscape.n), one_based=$(landscape.one_based_indexing)")
 
     optima = detect_local_optima(landscape; strict=true)
@@ -73,28 +118,36 @@ function main()
     write_runs_csv(joinpath(out_dir, "runs.csv"), runs)
     write_optima_csv(joinpath(out_dir, "local_optima.csv"), optima)
     write_convergence_csv(joinpath(out_dir, "convergence.csv"), mean_curve)
+    write_penalized_fitness_csv(joinpath(out_dir, "penalized_fitness.csv"), landscape)
 
     open(joinpath(out_dir, "summary.md"), "w") do io
-        println(io, "# MVP Summary")
+        println(io, "# Analysis Summary")
         println(io)
-        println(io, "- dataset: `$(dataset_path)`")
-        println(io, "- selected HDF5 dataset: `$(landscape.dataset_name)`")
+        println(io, "- dataset file: `$(dataset_path)`")
+        println(io, "- accuracy dataset: `$(landscape.accuracy_dataset_name)`")
+        println(io, "- times dataset: `$(landscape.times_dataset_name)`")
         println(io, "- states: $(length(landscape.values))")
         println(io, "- dimensions n: $(landscape.n)")
-        println(io, "- epsilon: $(landscape.epsilon)")
+        println(io, "- feature penalty epsilon: $(landscape.epsilon)")
+        println(io, "- time penalty weight: $(landscape.time_penalty)")
         println(io, "- local optima (strict, Hamming-1): $(length(optima))")
+        println(io, "- full penalized fitness table: `$(joinpath(out_dir, "penalized_fitness.csv"))`")
         @printf(io, "- best run fitness: %.8f\n", best_run.best_fitness)
         println(io, "- best run bitstring: `$(best_run.best_bitstring)`")
         @printf(io, "- mean best fitness (10 runs): %.8f\n", mean_best)
         @printf(io, "- std best fitness (10 runs): %.8f\n", std_best)
     end
-
+    
     println("----- SGA analysis summary -----")
     @printf("Best run fitness: %.8f\n", best_run.best_fitness)
     println("Best run bitstring: $(best_run.best_bitstring)")
     @printf("Mean best fitness (10 runs): %.8f\n", mean_best)
     @printf("Std best fitness (10 runs): %.8f\n", std_best)
     println("Artifacts written to $(out_dir)")
+
+    println("Generating landscape plot...")
+    plot_path = run_visualization_script(project_root, out_dir)
+    println("Landscape plot written to $(plot_path)")
 end
 
 main()
