@@ -1,7 +1,9 @@
 using Printf
 using Statistics
+using JSON
 
-include("landscape.jl")
+include("feature_landscape.jl")
+include("triangle_landscape.jl")
 include("sga.jl")
 
 function ensure_dir(path::AbstractString)
@@ -60,6 +62,31 @@ function write_penalized_fitness_csv(path::AbstractString, landscape::FeatureLan
     end
 end
 
+function write_penalized_fitness_csv(path::AbstractString, landscape::TriangleLandscape)
+    open(path, "w") do io
+        println(io, "row,decimal,bitstring,accuracy,normalized_time,active_features,penalized_fitness")
+
+        total_states = 1 << landscape.n
+        for decimal in 0:(total_states - 1)
+            bits = decimal_to_bits(decimal, landscape.n)
+            active_features = count(identity, bits)
+            fitness = fitness_bits(landscape, bits)
+
+            @printf(
+                io,
+                "%d,%d,%s,%.8f,%.8f,%d,%.8f\n",
+                decimal + 1,
+                decimal,
+                String(join(Int.(bits))),
+                Float64(fitness),
+                0.0,
+                active_features,
+                Float64(fitness),
+            )
+        end
+    end
+end
+
 function run_visualization_script(project_root::AbstractString, out_dir::AbstractString)
     script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
     penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
@@ -72,35 +99,83 @@ function run_visualization_script(project_root::AbstractString, out_dir::Abstrac
     output_svg
 end
 
+function resolve_path(project_root::AbstractString, path::AbstractString)
+    isabspath(path) ? path : joinpath(project_root, path)
+end
+
+function get_config_value(config, key::String, default)
+    haskey(config, key) ? config[key] : default
+end
+
+function to_int_vector(values)
+    [Int(v) for v in values]
+end
+
 function main()
     project_root = normpath(joinpath(@__DIR__, ".."))
-    dataset_path = "train_data/08-letter-r_knn_F.h5"
-    epsilon = 0.02
-    time_penalty = 0.1
-    out_dir = "artifacts/08_letter_r"
 
+    config_arg = length(ARGS) >= 1 ? ARGS[1] : "config.json"
+    config_path = resolve_path(project_root, config_arg)
+    isfile(config_path) || error("Missing config file: $(config_path)")
+    config = JSON.parsefile(config_path)
+
+    landscape_mode = Symbol(lowercase(String(get_config_value(config, "landscape_mode", "feature"))))
+    dataset_path = resolve_path(project_root, String(get_config_value(config, "dataset_path", "train_data/08-letter-r_knn_F.h5")))
+    epsilon = Float64(get_config_value(config, "epsilon", 0.02))
+    time_penalty = Float64(get_config_value(config, "time_penalty", 0.1))
+    out_dir = resolve_path(project_root, String(get_config_value(config, "out_dir", "artifacts/08_letter_r")))
+    strict_local_optima = Bool(get_config_value(config, "strict_local_optima", true))
+    run_visualization = Bool(get_config_value(config, "run_visualization", true))
+
+    triangle_config = haskey(config, "triangle") ? config["triangle"] : Dict{String, Any}()
+    triangle_n = Int(get_config_value(triangle_config, "n", 16))
+    triangle_m = Int(get_config_value(triangle_config, "m", 1))
+    triangle_s = Int(get_config_value(triangle_config, "s", 4))
+    triangle_out_dir = resolve_path(
+        project_root,
+        String(get_config_value(triangle_config, "out_dir", "artifacts/triangle_n$(triangle_n)_m$(triangle_m)_s$(triangle_s)")),
+    )
+
+    sga_config = haskey(config, "sga") ? config["sga"] : Dict{String, Any}()
     params = SGAParams(
-        population_size=120,
-        generations=150,
-        tournament_size=3,
-        crossover_rate=0.85,
-        mutation_rate=0.02,
+        population_size=Int(get_config_value(sga_config, "population_size", 120)),
+        generations=Int(get_config_value(sga_config, "generations", 150)),
+        tournament_size=Int(get_config_value(sga_config, "tournament_size", 3)),
+        crossover_rate=Float64(get_config_value(sga_config, "crossover_rate", 0.85)),
+        mutation_rate=Float64(get_config_value(sga_config, "mutation_rate", 0.02)),
     )
 
-    landscape = load_feature_landscape(
-        dataset_path;
-        epsilon=epsilon,
-        time_penalty=time_penalty,
-    )
-    println("Loaded file: $(dataset_path)")
-    println("Accuracy dataset: $(landscape.accuracy_dataset_name)")
-    println("Times dataset: $(landscape.times_dataset_name)")
-    println("States: $(length(landscape.values)), n=$(landscape.n), one_based=$(landscape.one_based_indexing)")
+    seeds = if haskey(config, "seeds")
+        to_int_vector(config["seeds"])
+    else
+        seed_start = Int(get_config_value(config, "seed_start", 1000))
+        seed_end = Int(get_config_value(config, "seed_end", 1009))
+        collect(seed_start:seed_end)
+    end
 
-    optima = detect_local_optima(landscape; strict=true)
+    if landscape_mode == :feature
+        landscape = load_feature_landscape(
+            dataset_path;
+            epsilon=epsilon,
+            time_penalty=time_penalty,
+        )
+        println("Landscape mode: feature")
+        println("Loaded file: $(dataset_path)")
+        println("Accuracy dataset: $(landscape.accuracy_dataset_name)")
+        println("Times dataset: $(landscape.times_dataset_name)")
+        println("States: $(length(landscape.values)), n=$(landscape.n), one_based=$(landscape.one_based_indexing)")
+    elseif landscape_mode == :triangle
+        landscape = load_triangle_landscape(n=triangle_n, m=triangle_m, s=triangle_s)
+        out_dir = triangle_out_dir
+        println("Landscape mode: triangle")
+        println("Triangle params: n=$(landscape.n), m=$(landscape.m), s=$(landscape.s)")
+        println("States: $(1 << landscape.n)")
+    else
+        error("Unsupported landscape_mode=$(landscape_mode). Use feature or triangle in config JSON")
+    end
+
+    optima = detect_local_optima(landscape; strict=strict_local_optima)
     println("Strict local optima count: $(length(optima))")
-
-    seeds = collect(1000:1009)
     runs = [run_sga(landscape, params; seed=s) for s in seeds]
 
     best_values = [r.best_fitness for r in runs]
@@ -123,31 +198,44 @@ function main()
     open(joinpath(out_dir, "summary.md"), "w") do io
         println(io, "# Analysis Summary")
         println(io)
-        println(io, "- dataset file: `$(dataset_path)`")
-        println(io, "- accuracy dataset: `$(landscape.accuracy_dataset_name)`")
-        println(io, "- times dataset: `$(landscape.times_dataset_name)`")
-        println(io, "- states: $(length(landscape.values))")
-        println(io, "- dimensions n: $(landscape.n)")
-        println(io, "- feature penalty epsilon: $(landscape.epsilon)")
-        println(io, "- time penalty weight: $(landscape.time_penalty)")
+        println(io, "- config file: `$(config_path)`")
+        println(io, "- landscape mode: `$(landscape_mode)`")
+        if landscape_mode == :feature
+            println(io, "- dataset file: `$(dataset_path)`")
+            println(io, "- accuracy dataset: `$(landscape.accuracy_dataset_name)`")
+            println(io, "- times dataset: `$(landscape.times_dataset_name)`")
+            println(io, "- states: $(length(landscape.values))")
+            println(io, "- dimensions n: $(landscape.n)")
+            println(io, "- feature penalty epsilon: $(landscape.epsilon)")
+            println(io, "- time penalty weight: $(landscape.time_penalty)")
+        else
+            println(io, "- triangle n: $(landscape.n)")
+            println(io, "- triangle m: $(landscape.m)")
+            println(io, "- triangle s: $(landscape.s)")
+            println(io, "- states: $(1 << landscape.n)")
+        end
         println(io, "- local optima (strict, Hamming-1): $(length(optima))")
         println(io, "- full penalized fitness table: `$(joinpath(out_dir, "penalized_fitness.csv"))`")
         @printf(io, "- best run fitness: %.8f\n", best_run.best_fitness)
         println(io, "- best run bitstring: `$(best_run.best_bitstring)`")
-        @printf(io, "- mean best fitness (10 runs): %.8f\n", mean_best)
-        @printf(io, "- std best fitness (10 runs): %.8f\n", std_best)
+        @printf(io, "- mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
+        @printf(io, "- std best fitness (%d runs): %.8f\n", length(seeds), std_best)
     end
     
     println("----- SGA analysis summary -----")
     @printf("Best run fitness: %.8f\n", best_run.best_fitness)
     println("Best run bitstring: $(best_run.best_bitstring)")
-    @printf("Mean best fitness (10 runs): %.8f\n", mean_best)
-    @printf("Std best fitness (10 runs): %.8f\n", std_best)
+    @printf("Mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
+    @printf("Std best fitness (%d runs): %.8f\n", length(seeds), std_best)
     println("Artifacts written to $(out_dir)")
 
-    println("Generating landscape plot...")
-    plot_path = run_visualization_script(project_root, out_dir)
-    println("Landscape plot written to $(plot_path)")
+    if run_visualization
+        println("Generating landscape plot...")
+        plot_path = run_visualization_script(project_root, out_dir)
+        println("Landscape plot written to $(plot_path)")
+    else
+        println("Skipping landscape plot generation (run_visualization=false)")
+    end
 end
 
 main()

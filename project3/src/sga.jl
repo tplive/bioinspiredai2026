@@ -58,13 +58,25 @@ function enforce_non_empty!(bits::Vector{Bool}, rng::AbstractRNG)
     bits[rand(rng, eachindex(bits))] = true
 end
 
-function run_sga(landscape::FeatureLandscape, params::SGAParams; seed::Int)
+landscape_n(landscape) = getproperty(landscape, :n)
+
+function enforce_non_empty_population(landscape)
+    if hasproperty(landscape, :one_based_indexing)
+        return getproperty(landscape, :one_based_indexing)
+    end
+    false
+end
+
+function run_sga(landscape, params::SGAParams; seed::Int)
     rng = MersenneTwister(seed)
+    n = landscape_n(landscape)
+    enforce_non_empty = enforce_non_empty_population(landscape)
+
     population = initialize_population(
-        landscape.n,
+        n,
         params.population_size,
         rng;
-        enforce_non_empty=landscape.one_based_indexing,
+        enforce_non_empty=enforce_non_empty,
     )
 
     fitnesses = [fitness_bits(landscape, bits) for bits in population]
@@ -88,7 +100,7 @@ function run_sga(landscape::FeatureLandscape, params::SGAParams; seed::Int)
             mutate!(c1, params.mutation_rate, rng)
             mutate!(c2, params.mutation_rate, rng)
 
-            if landscape.one_based_indexing
+            if enforce_non_empty
                 enforce_non_empty!(c1, rng)
                 enforce_non_empty!(c2, rng)
             end

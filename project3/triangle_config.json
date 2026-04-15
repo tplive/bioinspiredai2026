@@ -1,0 +1,20 @@
+{
+  "landscape_mode": "triangle",
+  "out_dir": "artifacts/triangle_n16_m1_s4",
+  "strict_local_optima": true,
+  "run_visualization": true,
+  "seed_start": 1000,
+  "seed_end": 1009,
+  "sga": {
+    "population_size": 120,
+    "generations": 150,
+    "tournament_size": 3,
+    "crossover_rate": 0.85,
+    "mutation_rate": 0.02
+  },
+  "triangle": {
+    "n": 16,
+    "m": 1,
+    "s": 4
+  }
+}
