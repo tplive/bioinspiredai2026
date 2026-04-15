@@ -162,10 +162,11 @@ function main()
     triangle_n = Int(get_config_value(triangle_config, "n", 16))
     triangle_m = Int(get_config_value(triangle_config, "m", 1))
     triangle_s = Int(get_config_value(triangle_config, "s", 4))
-    triangle_out_dir = resolve_path(
-        project_root,
-        String(get_config_value(triangle_config, "out_dir", "artifacts/triangle_n$(triangle_n)_m$(triangle_m)_s$(triangle_s)")),
-    )
+    triangle_out_dir = if haskey(triangle_config, "out_dir")
+        resolve_path(project_root, String(triangle_config["out_dir"]))
+    else
+        out_dir
+    end
 
     sga_config = haskey(config, "sga") ? config["sga"] : Dict{String, Any}()
     aco_config = haskey(config, "aco") ? config["aco"] : Dict{String, Any}()
