@@ -5,6 +5,7 @@ using JSON
 include("feature_landscape.jl")
 include("triangle_landscape.jl")
 include("sga.jl")
+include("nsga2.jl")
 
 function ensure_dir(path::AbstractString)
     isdir(path) || mkpath(path)
@@ -124,6 +125,17 @@ function select_optima_for_plot(optima; plot_optima::Bool=true, plot_top_n_optim
     sorted_optima[1:keep_count]
 end
 
+function resolve_optimizer(name::AbstractString)
+    normalized = lowercase(strip(name))
+    if normalized == "sga"
+        return run_sga
+    elseif normalized in ("nsga2", "nsga-ii", "nsga_ii")
+        return run_nsga2
+    else
+        error("Unsupported optimizer=$(name). Use 'sga' or 'nsga2'.")
+    end
+end
+
 function main()
     project_root = normpath(joinpath(@__DIR__, ".."))
 
@@ -141,6 +153,7 @@ function main()
     run_visualization = Bool(get_config_value(config, "run_visualization", true))
     plot_optima = Bool(get_config_value(config, "plot_optima", true))
     plot_top_n_optima = Int(get_config_value(config, "plot_top_n_optima", 0))
+    optimizer_name = String(get_config_value(config, "optimizer", "sga"))
 
     triangle_config = haskey(config, "triangle") ? config["triangle"] : Dict{String, Any}()
     triangle_n = Int(get_config_value(triangle_config, "n", 16))
@@ -168,6 +181,8 @@ function main()
         collect(seed_start:seed_end)
     end
 
+    run_optimizer = resolve_optimizer(optimizer_name)
+
     if landscape_mode == :feature
         landscape = load_feature_landscape(
             dataset_path;
@@ -191,7 +206,8 @@ function main()
 
     optima = detect_local_optima(landscape; strict=strict_local_optima)
     println("Strict local optima count: $(length(optima))")
-    runs = [run_sga(landscape, params; seed=s) for s in seeds]
+    println("Optimizer: $(optimizer_name)")
+    runs = [run_optimizer(landscape, params; seed=s) for s in seeds]
 
     best_values = [r.best_fitness for r in runs]
     mean_best = mean(best_values)
@@ -226,6 +242,7 @@ function main()
         println(io)
         println(io, "- config file: `$(config_path)`")
         println(io, "- landscape mode: `$(landscape_mode)`")
+        println(io, "- optimizer: `$(optimizer_name)`")
         if landscape_mode == :feature
             println(io, "- dataset file: `$(dataset_path)`")
             println(io, "- accuracy dataset: `$(landscape.accuracy_dataset_name)`")
