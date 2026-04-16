@@ -1,4 +1,5 @@
 using Plots
+using Random
 using Statistics
 
 struct FitnessPoint
@@ -90,6 +91,89 @@ function mean_by_feature_count(points::Vector{FitnessPoint})
     counts, means
 end
 
+function point_lookup(points::Vector{FitnessPoint})
+    Dict(p.decimal => p for p in points)
+end
+
+function sample_uniform_fraction(points::Vector{FitnessPoint}, fraction::Float64; rng::AbstractRNG=MersenneTwister(42))
+    fraction <= 0.0 && return FitnessPoint[]
+    fraction >= 1.0 && return copy(points)
+
+    sample_count = max(1, round(Int, fraction * length(points)))
+    indices = randperm(rng, length(points))[1:sample_count]
+    points[sort(indices)]
+end
+
+function write_landscape_3d_png(
+    path::AbstractString,
+    points::Vector{FitnessPoint},
+    local_optima::Vector{OptimumPoint},
+    n::Int;
+    sample_fraction::Float64=0.20,
+)
+    sampled_points = sample_uniform_fraction(points, sample_fraction)
+    lookup = point_lookup(points)
+
+    sampled_x = [p.active_features for p in sampled_points]
+    sampled_y = [p.normalized_time for p in sampled_points]
+    sampled_z = [p.penalized_fitness for p in sampled_points]
+
+    opt_x = Int[]
+    opt_y = Float64[]
+    opt_z = Float64[]
+    for opt in local_optima
+        haskey(lookup, opt.decimal) || continue
+        p = lookup[opt.decimal]
+        push!(opt_x, p.active_features)
+        push!(opt_y, p.normalized_time)
+        push!(opt_z, opt.fitness)
+    end
+
+    labeled_opt = sort(local_optima; by=o -> o.fitness, rev=true)[1:min(8, length(local_optima))]
+
+    p = scatter3d(
+        sampled_x,
+        sampled_y,
+        sampled_z;
+        xlabel="active features",
+        ylabel="normalized time",
+        zlabel="fitness",
+        title="3D Landscape Around Local Optima",
+        marker=:circle,
+        markersize=3,
+        markerstrokewidth=0,
+        alpha=0.28,
+        marker_z=sampled_z,
+        c=:viridis,
+        colorbar_title="fitness",
+        legend=false,
+        size=(1400, 980),
+        camera=(45, 30),
+    )
+
+    if !isempty(opt_x)
+        scatter3d!(
+            p,
+            opt_x,
+            opt_y,
+            opt_z;
+            marker=:diamond,
+            markersize=7,
+            markercolor=:red,
+            markerstrokecolor=:darkred,
+            label="local optima",
+        )
+
+        for opt in labeled_opt
+            haskey(lookup, opt.decimal) || continue
+            p0 = lookup[opt.decimal]
+            annotate!(p, p0.active_features, p0.normalized_time, opt.fitness, text("$(opt.bitstring)", 7, :black))
+        end
+    end
+
+    savefig(p, path)
+end
+
 function write_landscape_png(path::AbstractString, points::Vector{FitnessPoint}, local_optima::Vector{OptimumPoint}, n::Int)
     feature_counts = [p.active_features for p in points]
     fitness_values = [p.penalized_fitness for p in points]
@@ -179,6 +263,8 @@ function main()
     penalized_csv = length(ARGS) >= 1 ? ARGS[1] : "artifacts/01_breast_w/penalized_fitness.csv"
     local_optima_csv = length(ARGS) >= 2 ? ARGS[2] : "artifacts/01_breast_w/local_optima.csv"
     output_png = length(ARGS) >= 3 ? ARGS[3] : "artifacts/01_breast_w/fitness_landscape.png"
+    output_3d_png = length(ARGS) >= 4 ? ARGS[4] : nothing
+    sample_fraction = length(ARGS) >= 5 ? parse(Float64, ARGS[5]) : 0.20
 
     fitness_points = read_penalized_fitness_csv(penalized_csv)
     local_optima = read_csv_local_optima(local_optima_csv)
@@ -188,8 +274,15 @@ function main()
     isdir(out_dir) || mkpath(out_dir)
 
     write_landscape_png(output_png, fitness_points, local_optima, n)
+    if output_3d_png !== nothing
+        write_landscape_3d_png(output_3d_png, fitness_points, local_optima, n; sample_fraction=sample_fraction)
+    end
 
     println("Wrote: $(output_png)")
+    if output_3d_png !== nothing
+        println("Wrote: $(output_3d_png)")
+        println("3D sample fraction: $(sample_fraction)")
+    end
     println("Source CSV: $(penalized_csv)")
     println("Optima CSV: $(local_optima_csv)")
     println("States represented: $(length(fitness_points)), n=$(n)")
