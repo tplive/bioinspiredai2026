@@ -1,7 +1,7 @@
 {
   "landscape_mode": "triangle",
   "optimizer": "aco",
-  "out_dir": "artifacts/triangle_n8_m1_s2_aco",
+  "out_dir": "artifacts/triangle_n16_m1_s4_aco",
   "strict_local_optima": true,
   "run_visualization": true,
   "plot_optima": true,
@@ -29,8 +29,8 @@
     "enforce_non_empty": true
   },
   "triangle": {
-    "n": 8,
+    "n": 16,
     "m": 1,
-    "s": 2
+    "s": 4
   }
 }

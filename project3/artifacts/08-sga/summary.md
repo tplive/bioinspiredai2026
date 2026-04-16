@@ -1,0 +1,25 @@
+# Analysis Summary
+
+- config file: `/home/thomas/Projects/bioinspiredai2026/project3/landscape_config.json`
+- landscape mode: `feature`
+- optimizer: `sga`
+- dataset file: `/home/thomas/Projects/bioinspiredai2026/project3/train_data/08.h5`
+- accuracy dataset: `accuracies`
+- times dataset: `times`
+- states: 65535
+- dimensions n: 16
+- feature penalty epsilon: 0.02
+- time penalty weight: 0.1
+- local optima (strict, Hamming-1): 7
+- optima plotted: 7
+- plot_optima: true
+- plot_top_n_optima: 0
+- full penalized fitness table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/08-sga/penalized_fitness.csv`
+- full optima table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/08-sga/local_optima.csv`
+- plotted optima table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/08-sga/local_optima_plot.csv`
+- convergence table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/08-sga/convergence.csv`
+- convergence plot: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/08-sga/convergence_curve.png`
+- best run fitness: 0.77579500
+- best run bitstring: `0000000111111011`
+- mean best fitness (10 runs): 0.77579500
+- std best fitness (10 runs): 0.00000000

@@ -92,12 +92,23 @@ end
 function run_visualization_script(project_root::AbstractString, out_dir::AbstractString, local_optima_csv::AbstractString)
     script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
     penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
-    output_svg = joinpath(out_dir, "fitness_landscape_3d.svg")
+    output_png = joinpath(out_dir, "fitness_landscape.png")
 
-    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(penalized_csv) $(local_optima_csv) $(output_svg)`
+    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(penalized_csv) $(local_optima_csv) $(output_png)`
     run(cmd)
 
-    output_svg
+    output_png
+end
+
+function run_convergence_visualization_script(project_root::AbstractString, out_dir::AbstractString)
+    script_path = joinpath(project_root, "scripts", "visualize_convergence.jl")
+    convergence_csv = joinpath(out_dir, "convergence.csv")
+    output_png = joinpath(out_dir, "convergence_curve.png")
+
+    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(convergence_csv) $(output_png)`
+    run(cmd)
+
+    output_png
 end
 
 function resolve_path(project_root::AbstractString, path::AbstractString)
@@ -255,7 +266,10 @@ function main()
     )
     write_optima_csv(local_optima_plot_path, plot_optima_rows)
 
-    write_convergence_csv(joinpath(out_dir, "convergence.csv"), mean_curve)
+    convergence_csv_path = joinpath(out_dir, "convergence.csv")
+    convergence_plot_path = joinpath(out_dir, "convergence_curve.png")
+
+    write_convergence_csv(convergence_csv_path, mean_curve)
     write_penalized_fitness_csv(joinpath(out_dir, "penalized_fitness.csv"), landscape)
 
     open(joinpath(out_dir, "summary.md"), "w") do io
@@ -285,6 +299,8 @@ function main()
         println(io, "- full penalized fitness table: `$(joinpath(out_dir, "penalized_fitness.csv"))`")
         println(io, "- full optima table: `$(local_optima_path)`")
         println(io, "- plotted optima table: `$(local_optima_plot_path)`")
+        println(io, "- convergence table: `$(convergence_csv_path)`")
+        println(io, "- convergence plot: `$(convergence_plot_path)`")
         @printf(io, "- best run fitness: %.8f\n", best_run.best_fitness)
         println(io, "- best run bitstring: `$(best_run.best_bitstring)`")
         @printf(io, "- mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
@@ -302,8 +318,12 @@ function main()
         println("Generating landscape plot...")
         plot_path = run_visualization_script(project_root, out_dir, local_optima_plot_path)
         println("Landscape plot written to $(plot_path)")
+
+        println("Generating convergence plot...")
+        convergence_path = run_convergence_visualization_script(project_root, out_dir)
+        println("Convergence plot written to $(convergence_path)")
     else
-        println("Skipping landscape plot generation (run_visualization=false)")
+        println("Skipping visualization generation (run_visualization=false)")
     end
 end
 

@@ -1,0 +1,23 @@
+# Analysis Summary
+
+- config file: `/home/thomas/Projects/bioinspiredai2026/project3/landscape_config.json`
+- landscape mode: `feature`
+- optimizer: `sga`
+- dataset file: `/home/thomas/Projects/bioinspiredai2026/project3/train_data/01-breast-w_lr_F.h5`
+- accuracy dataset: `accuracies`
+- times dataset: `times`
+- states: 511
+- dimensions n: 9
+- feature penalty epsilon: 0.02
+- time penalty weight: 0.1
+- local optima (strict, Hamming-1): 9
+- optima plotted: 9
+- plot_optima: true
+- plot_top_n_optima: 0
+- full penalized fitness table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/01_breast_w_sga/penalized_fitness.csv`
+- full optima table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/01_breast_w_sga/local_optima.csv`
+- plotted optima table: `/home/thomas/Projects/bioinspiredai2026/project3/artifacts/01_breast_w_sga/local_optima_plot.csv`
+- best run fitness: 0.90658085
+- best run bitstring: `010001000`
+- mean best fitness (10 runs): 0.90658085
+- std best fitness (10 runs): 0.00000000
