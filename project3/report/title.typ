@@ -1,5 +1,5 @@
 #let author = "Thomas Hansen"
-#let date = "29.03.2026"
+#let date = "22.04.2026"
 #let dept = "Department of Information Technology"
 #let course_code = "IT3708"
 #let course_name = "Bio-Inspired Artificial Intelligence"
