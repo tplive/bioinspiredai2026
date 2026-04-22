@@ -1,7 +1,7 @@
 using Plots
 using Random
 
-local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
 struct FitnessPoint
     row::Int
@@ -20,7 +20,7 @@ struct OptimumPoint
     bitstring::String
 end
 
-function read_penalized_fitness_csv(path::AbstractString)
+function read_penalized_fitness_csv(path::String)
     isfile(path) || error("Missing penalized fitness CSV: $(local_display_path(path))")
 
     points = FitnessPoint[]
@@ -51,7 +51,7 @@ function read_penalized_fitness_csv(path::AbstractString)
     points
 end
 
-function read_csv_local_optima(path::AbstractString)
+function read_csv_local_optima(path::String)
     isfile(path) || error("Missing local optima CSV: $(local_display_path(path))")
 
     points = OptimumPoint[]

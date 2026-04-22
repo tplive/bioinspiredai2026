@@ -2,13 +2,13 @@ using JSON
 using Printf
 using Statistics
 
-local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
-function ensure_dir(path::AbstractString)
+function ensure_dir(path::String)
     isdir(path) || mkpath(path)
 end
 
-function read_runs_csv(path::AbstractString)
+function read_runs_csv(path::String)
     isfile(path) || error("Missing runs CSV: $(local_display_path(path))")
 
     rows = NamedTuple[]
@@ -33,7 +33,7 @@ function read_runs_csv(path::AbstractString)
     rows
 end
 
-function read_optima_count(path::AbstractString)
+function read_optima_count(path::String)
     isfile(path) || return 0
 
     count = 0
@@ -47,28 +47,28 @@ function read_optima_count(path::AbstractString)
     count
 end
 
-function sanitize_name(path::AbstractString)
+function sanitize_name(path::String)
     base = splitext(basename(path))[1]
     replace(base, r"[^A-Za-z0-9_-]" => "_")
 end
 
-function write_json(path::AbstractString, data)
+function write_json(path::String, data)
     open(path, "w") do io
         write(io, JSON.json(data, 2))
     end
 end
 
-function run_main_with_config(project_root::AbstractString, config_path::AbstractString)
+function run_main_with_config(project_root::String, config_path::String)
     main_path = joinpath(project_root, "src", "main.jl")
     cmd = `$(Base.julia_cmd()) --project=$(project_root) $(main_path) $(config_path)`
     run(cmd)
 end
 
-function display_path(project_root::AbstractString, path::AbstractString)
+function display_path(project_root::String, path::String)
     isabspath(path) ? relpath(path, project_root) : path
 end
 
-function default_datasets(project_root::AbstractString)
+function default_datasets(project_root::String)
     train_dir = joinpath(project_root, "train_data")
     isdir(train_dir) || error("Missing train_data directory: $(display_path(project_root, train_dir))")
 
@@ -78,7 +78,7 @@ function default_datasets(project_root::AbstractString)
     [relpath(p, project_root) for p in files]
 end
 
-function write_summary_csv(path::AbstractString, rows)
+function write_summary_csv(path::String, rows)
     open(path, "w") do io
         println(io, "dataset,optimizer,runs,best_fitness,mean_best_fitness,std_best_fitness,best_bitstring,local_optima_count,out_dir")
         for r in rows
@@ -99,7 +99,7 @@ function write_summary_csv(path::AbstractString, rows)
     end
 end
 
-function write_summary_md(path::AbstractString, rows)
+function write_summary_md(path::String, rows)
     open(path, "w") do io
         println(io, "# Batch Experiment Summary")
         println(io)

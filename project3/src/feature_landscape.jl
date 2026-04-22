@@ -1,7 +1,7 @@
 using HDF5
 using Statistics
 
-local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
 struct FeatureLandscape
     values::Vector{Float64}
@@ -14,7 +14,7 @@ struct FeatureLandscape
     times_dataset_name::String
 end
 
-function read_h5_metric(path::AbstractString, dataset_name::String)
+function read_h5_metric(path::String, dataset_name::String)
 
     h5open(path, "r") do h5
         raw = read(h5[dataset_name])
@@ -29,7 +29,7 @@ end
 If accuracies are stored as a 2D matrix (states x repeats/folds),
 this returns one value per state by taking the mean across columns.
 """
-function read_accuracies_lookup(path::AbstractString, dataset_name::String)
+function read_accuracies_lookup(path::String, dataset_name::String)
     h5open(path, "r") do h5
         raw = read(h5[dataset_name])
         if ndims(raw) == 1
@@ -52,7 +52,7 @@ function normalize(v::Vector{Float64})
     (v .- vmin) ./ d # Else do matrix calc on vector
 end
 
-function load_feature_landscape(path::AbstractString; epsilon::Float64=0.02, time_penalty::Float64=0.10)
+function load_feature_landscape(path::String; epsilon::Float64=0.02, time_penalty::Float64=0.10)
     dataset_names = String[]
 
     h5open(path, "r") do h5

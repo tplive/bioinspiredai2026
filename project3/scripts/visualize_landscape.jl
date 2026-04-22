@@ -2,7 +2,7 @@ using Plots
 using Random
 using Statistics
 
-local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
 struct FitnessPoint
     row::Int
@@ -21,7 +21,7 @@ struct OptimumPoint
     bitstring::String
 end
 
-function read_penalized_fitness_csv(path::AbstractString)
+function read_penalized_fitness_csv(path::String)
     isfile(path) || error("Missing penalized fitness CSV: $(local_display_path(path))")
 
     points = FitnessPoint[]
@@ -52,7 +52,7 @@ function read_penalized_fitness_csv(path::AbstractString)
     points
 end
 
-function read_csv_local_optima(path::AbstractString)
+function read_csv_local_optima(path::String)
     isfile(path) || error("Missing local optima CSV: $(local_display_path(path))")
 
     points = OptimumPoint[]
@@ -107,7 +107,7 @@ function sample_uniform_fraction(points::Vector{FitnessPoint}, fraction::Float64
 end
 
 function write_landscape_3d_png(
-    path::AbstractString,
+    path::String,
     points::Vector{FitnessPoint},
     local_optima::Vector{OptimumPoint},
     n::Int;
@@ -176,7 +176,7 @@ function write_landscape_3d_png(
     savefig(p, path)
 end
 
-function write_landscape_png(path::AbstractString, points::Vector{FitnessPoint}, local_optima::Vector{OptimumPoint}, n::Int)
+function write_landscape_png(path::String, points::Vector{FitnessPoint}, local_optima::Vector{OptimumPoint}, n::Int)
     feature_counts = [p.active_features for p in points]
     fitness_values = [p.penalized_fitness for p in points]
     time_values = [p.normalized_time for p in points]

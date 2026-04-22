@@ -1,13 +1,13 @@
 using Plots
 
-local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
 struct ConvergencePoint
     generation::Int
     mean_best_so_far::Float64
 end
 
-function read_convergence_csv(path::AbstractString)
+function read_convergence_csv(path::String)
     isfile(path) || error("Missing convergence CSV: $(local_display_path(path))")
 
     points = ConvergencePoint[]
@@ -30,7 +30,7 @@ function read_convergence_csv(path::AbstractString)
     points
 end
 
-function write_convergence_png(path::AbstractString, points::Vector{ConvergencePoint})
+function write_convergence_png(path::String, points::Vector{ConvergencePoint})
     generations = [p.generation for p in points]
     values = [p.mean_best_so_far for p in points]
 
