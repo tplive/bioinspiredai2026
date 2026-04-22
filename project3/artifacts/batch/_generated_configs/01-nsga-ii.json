@@ -1,0 +1,33 @@
+{
+  "landscape_mode": "feature",
+  "optimizer": "nsga-ii",
+  "dataset_path": "train_data/01.h5",
+  "epsilon": 0.02,
+  "time_penalty": 0.01,
+  "out_dir": "artifacts/batch/01-nsga-ii",
+  "strict_local_optima": true,
+  "run_visualization": false,
+  "plot_optima": true,
+  "plot_top_n_optima": 0,
+  "seed_start": 1000,
+  "seed_end": 1009,
+  "sga": {
+    "population_size": 120,
+    "generations": 150,
+    "tournament_size": 3,
+    "crossover_rate": 0.85,
+    "mutation_rate": 0.02
+  },
+  "aco": {
+    "ant_count": 120,
+    "iterations": 150,
+    "evaporation_rate": 0.25,
+    "alpha": 1.0,
+    "beta": 2.0,
+    "elite_count": 5,
+    "deposit_weight": 1.0,
+    "initial_pheromone": 0.5,
+    "min_pheromone": 0.05,
+    "max_pheromone": 0.95
+  }
+}
