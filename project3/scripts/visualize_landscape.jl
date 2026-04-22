@@ -278,13 +278,9 @@ function main()
         write_landscape_3d_png(output_3d_png, fitness_points, local_optima, n; sample_fraction=sample_fraction)
     end
 
-    println("Wrote: $(output_png)")
     if output_3d_png !== nothing
-        println("Wrote: $(output_3d_png)")
         println("3D sample fraction: $(sample_fraction)")
     end
-    println("Source CSV: $(penalized_csv)")
-    println("Optima CSV: $(local_optima_csv)")
     println("States represented: $(length(fitness_points)), n=$(n)")
     println("Strict local optima: $(length(local_optima))")
 end

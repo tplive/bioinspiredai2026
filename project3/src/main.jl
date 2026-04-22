@@ -155,7 +155,7 @@ end
 function main()
     project_root = normpath(joinpath(@__DIR__, ".."))
 
-    config_arg = length(ARGS) >= 1 ? ARGS[1] : "config.json"
+    config_arg = length(ARGS) >= 1 ? ARGS[1] : "configuration.json"
     config_path = resolve_path(project_root, config_arg)
     isfile(config_path) || error("Missing config file: $(config_path)")
     config = JSON.parsefile(config_path)
@@ -278,13 +278,9 @@ function main()
     open(joinpath(out_dir, "summary.md"), "w") do io
         println(io, "# Analysis Summary")
         println(io)
-        println(io, "- config file: `$(config_path)`")
         println(io, "- landscape mode: `$(landscape_mode)`")
         println(io, "- optimizer: `$(optimizer_name)`")
         if landscape_mode == :feature
-            println(io, "- dataset file: `$(dataset_path)`")
-            println(io, "- accuracy dataset: `$(landscape.accuracy_dataset_name)`")
-            println(io, "- times dataset: `$(landscape.times_dataset_name)`")
             println(io, "- states: $(length(landscape.values))")
             println(io, "- dimensions n: $(landscape.n)")
             println(io, "- feature penalty epsilon: $(landscape.epsilon)")
@@ -299,37 +295,24 @@ function main()
         println(io, "- optima plotted: $(length(plot_optima_rows))")
         println(io, "- plot_optima: $(plot_optima)")
         println(io, "- plot_top_n_optima: $(plot_top_n_optima)")
-        println(io, "- full penalized fitness table: `$(joinpath(out_dir, "penalized_fitness.csv"))`")
-        println(io, "- full optima table: `$(local_optima_path)`")
-        println(io, "- plotted optima table: `$(local_optima_plot_path)`")
-        println(io, "- landscape plot: `$(joinpath(out_dir, "fitness_landscape.png"))`")
-        println(io, "- 3D landscape plot: `$(landscape_3d_path)`")
-        println(io, "- convergence table: `$(convergence_csv_path)`")
-        println(io, "- convergence plot: `$(convergence_plot_path)`")
         @printf(io, "- best run fitness: %.8f\n", best_run.best_fitness)
         println(io, "- best run bitstring: `$(best_run.best_bitstring)`")
         @printf(io, "- mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
         @printf(io, "- std best fitness (%d runs): %.8f\n", length(seeds), std_best)
     end
     
-    println("----- SGA analysis summary -----")
+    println("----- Analysis summary -----")
     @printf("Best run fitness: %.8f\n", best_run.best_fitness)
     println("Best run bitstring: $(best_run.best_bitstring)")
     @printf("Mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
     @printf("Std best fitness (%d runs): %.8f\n", length(seeds), std_best)
-    println("Artifacts written to $(out_dir)")
 
     if run_visualization
         println("Generating landscape plot...")
-        plot_path, plot_3d_path = run_visualization_script(project_root, out_dir, local_optima_plot_path)
-        println("Landscape plot written to $(plot_path)")
-        println("3D landscape plot written to $(plot_3d_path)")
+        run_visualization_script(project_root, out_dir, local_optima_plot_path)
 
         println("Generating convergence plot...")
-        convergence_path = run_convergence_visualization_script(project_root, out_dir)
-        println("Convergence plot written to $(convergence_path)")
-    else
-        println("Skipping visualization generation (run_visualization=false)")
+        run_convergence_visualization_script(project_root, out_dir)
     end
 end
 

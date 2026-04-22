@@ -64,8 +64,6 @@ function main()
     points = read_convergence_csv(csv_path)
     write_convergence_png(out_path, points)
 
-    println("Source CSV: $(csv_path)")
-    println("Wrote: $(out_path)")
     println("Generations represented: $(length(points))")
 end
 

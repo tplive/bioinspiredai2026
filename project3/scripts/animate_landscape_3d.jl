@@ -174,9 +174,6 @@ function main()
 
     mp4(animation, output_video; fps=fps)
 
-    println("Wrote: $(output_video)")
-    println("Source CSV: $(penalized_csv)")
-    println("Optima CSV: $(local_optima_csv)")
     println("States represented (full): $(length(points))")
     println("States represented (sampled): $(length(sampled_points))")
     println("Local optima: $(length(local_optima))")
