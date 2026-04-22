@@ -60,46 +60,9 @@ This section tries to summarize some of the experiment outputs.
 
 == Feature-selection landscapes
 
-For the three feature-selection landscapes (breast_w_01, letter_r_05, and credit_a_08), ACO and NSGA-II consistently outperformed SGA in terms of best fitness and mean best fitness over 10 seeds, see @table-exp-results.
+For the three feature-selection landscapes (breast_w_01, letter_r_05, and credit_a_08), ACO and NSGA-II consistently outperformed SGA in terms of best fitness and mean best fitness over 10 seeds, see @batch-exp-summary.
 
-#figure(
-	kind: table,
-	placement: top,
-	scope: "parent",
-	caption: [Feature-selection landscape results across algorithms (10 seeds per configuration).],
-)[
-	#table(
-		columns: (auto, auto, auto, auto, auto, auto),
-		inset: 6pt,
-		stroke: 0.4pt,
-		align: center,
-		table.header[
-			Landscape
-		][
-			Local optima
-		][
-			Algorithm
-		][
-			Best fitness
-		][
-			Mean best fitness
-		][
-			Std
-		],
 
-		[01-breast-w], [9], [ACO], [0.97012195], [0.97012195], [0.00000000],
-		[01-breast-w], [9], [NSGA-II], [0.97012195], [0.97007622], [0.00014462],
-		[01-breast-w], [9], [SGA], [0.90658085], [0.90658085], [0.00000000],
-
-		[05-credit-a], [1], [ACO], [0.89126275], [0.89123086], [0.00010084],
-		[05-credit-a], [1], [NSGA-II], [0.89126275], [0.88826530], [0.00162388],
-		[05-credit-a], [1], [SGA], [0.82601490], [0.82601490], [0.00000000],
-
-		[08-letter-r], [7], [ACO], [0.95633334], [0.95633334], [0.00000000],
-		[08-letter-r], [7], [NSGA-II], [0.95633334], [0.95633334], [0.00000000],
-		[08-letter-r], [7], [SGA], [0.77579500], [0.77579500], [0.00000000],
-	)
-]<table-exp-results>
 
 Overall, ACO and NSGA-II reached the same best values on all three feature landscapes, while SGA converged to clearly lower-quality solutions in this configuration.
 
@@ -123,6 +86,53 @@ Two patterns are clear from the artifact summaries:
 - Robustness: Most runs had very low dispersion across seeds, and several configurations achieved zero standard deviation, suggesting highly stable convergence under the selected parameter settings.
 
 At the same time, the 05-credit-a landscape showed slightly larger variance for NSGA-II than for ACO, which may indicate higher sensitivity to initialization or parent-offspring selection dynamics on that specific landscape.
+
+== Batch experiment summary
+
+The batch experiment summary below aggregates the feature-selection runs across the three landscapes and all three optimizers.
+
+#figure(
+	kind: table,
+	placement: top,
+	scope: "parent",
+	caption: [Batch experiment summary across all feature-selection landscapes and optimizers.],
+)[
+	#table(
+		columns: (auto, auto, auto, auto, auto, auto, auto, auto),
+		inset: 6pt,
+		stroke: 0.4pt,
+		align: center,
+		table.header[
+			Dataset
+		][
+			Optimizer
+		][
+			Runs
+		][
+			Best
+		][
+			Mean
+		][
+			Std
+		][
+			Best bitstring
+		][
+			Local optima
+		],
+
+		[01], [SGA], [10], [0.91473430], [0.91473430], [0.0], [010001000], [7], 
+		[01], [NSGA-II], [10], [0.97012195], [0.97007622], [0.00014], [111001111], [7],
+		[01], [ACO], [10], [0.97012195], [0.97012195], [0.0], [111001111], [7], 
+
+		[05], [SGA], [10], [0.84103182], [0.84103182], [0.0], [000000001000000], [1], 
+		[05], [NSGA-II], [10], [0.89126275], [0.88826530], [0.0016], [001110001110111], [1],
+		[05], [ACO], [10], [0.89126275], [0.89123086], [0.0001], [001110001110111], [1], 
+
+		[08], [SGA], [10], [0.77858575], [0.77858575], [0.0], [0000000111111011], [2], 
+		[08], [NSGA-II], [10], [0.95633334], [0.95633334], [0.0], [0000011111111111], [2],
+		[08], [ACO], [10], [0.95633334], [0.95633334], [0.0], [0000011111111111], [2], 
+	)
+]<batch-exp-summary>
 
 == Comments on the included figures
 - @img-01-aco-fitness-landscape-3d-png shows the breast-w-01 landscape after ACO has identified 9 local optima. With a landscape that is relatively small, peaks are easily identifiable. Even so, some of the optima are hard to read due to overlapping text.
