@@ -8,11 +8,11 @@ include("sga.jl")
 include("nsga2.jl")
 include("ant_colony.jl")
 
-function ensure_dir(path::AbstractString)
+function ensure_dir(path::String)
     isdir(path) || mkpath(path)
 end
 
-function write_runs_csv(path::AbstractString, runs)
+function write_runs_csv(path::String, runs)
     open(path, "w") do io
         println(io, "seed,best_fitness,best_bitstring")
         for r in runs
@@ -21,7 +21,7 @@ function write_runs_csv(path::AbstractString, runs)
     end
 end
 
-function write_optima_csv(path::AbstractString, optima)
+function write_optima_csv(path::String, optima)
     open(path, "w") do io
         println(io, "row,decimal,fitness,bitstring")
         for o in optima
@@ -30,7 +30,7 @@ function write_optima_csv(path::AbstractString, optima)
     end
 end
 
-function write_convergence_csv(path::AbstractString, mean_curve::Vector{Float64})
+function write_convergence_csv(path::String, mean_curve::Vector{Float64})
     open(path, "w") do io
         println(io, "generation,mean_best_so_far")
         for (g, v) in enumerate(mean_curve)
@@ -39,7 +39,7 @@ function write_convergence_csv(path::AbstractString, mean_curve::Vector{Float64}
     end
 end
 
-function write_penalized_fitness_csv(path::AbstractString, landscape::FeatureLandscape)
+function write_penalized_fitness_csv(path::String, landscape::FeatureLandscape)
     open(path, "w") do io
         println(io, "row,decimal,bitstring,accuracy,normalized_time,active_features,penalized_fitness")
 
@@ -64,7 +64,7 @@ function write_penalized_fitness_csv(path::AbstractString, landscape::FeatureLan
     end
 end
 
-function write_penalized_fitness_csv(path::AbstractString, landscape::TriangleLandscape)
+function write_penalized_fitness_csv(path::String, landscape::TriangleLandscape)
     open(path, "w") do io
         println(io, "row,decimal,bitstring,accuracy,normalized_time,active_features,penalized_fitness")
 
@@ -89,7 +89,7 @@ function write_penalized_fitness_csv(path::AbstractString, landscape::TriangleLa
     end
 end
 
-function run_visualization_script(project_root::AbstractString, out_dir::AbstractString, local_optima_csv::AbstractString)
+function run_visualization_script(project_root::String, out_dir::String, local_optima_csv::String)
     script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
     penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
     output_png = joinpath(out_dir, "fitness_landscape.png")
@@ -102,7 +102,7 @@ function run_visualization_script(project_root::AbstractString, out_dir::Abstrac
     (output_png, output_3d_png)
 end
 
-function run_convergence_visualization_script(project_root::AbstractString, out_dir::AbstractString)
+function run_convergence_visualization_script(project_root::String, out_dir::String)
     script_path = joinpath(project_root, "scripts", "visualize_convergence.jl")
     convergence_csv = joinpath(out_dir, "convergence.csv")
     output_png = joinpath(out_dir, "convergence_curve.png")
@@ -113,7 +113,7 @@ function run_convergence_visualization_script(project_root::AbstractString, out_
     output_png
 end
 
-function resolve_path(project_root::AbstractString, path::AbstractString)
+function resolve_path(project_root::String, path::String)
     isabspath(path) ? path : joinpath(project_root, path)
 end
 
@@ -139,7 +139,7 @@ function select_optima_for_plot(optima; plot_optima::Bool=true, plot_top_n_optim
     sorted_optima[1:keep_count]
 end
 
-function resolve_optimizer(name::AbstractString)
+function resolve_optimizer(name::String)
     normalized = lowercase(strip(name))
     if normalized == "sga"
         return run_sga
