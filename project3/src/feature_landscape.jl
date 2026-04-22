@@ -1,6 +1,8 @@
 using HDF5
 using Statistics
 
+local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+
 struct FeatureLandscape
     values::Vector{Float64}
     times::Vector{Float64}
@@ -18,7 +20,7 @@ function read_h5_metric(path::AbstractString, dataset_name::String)
         raw = read(h5[dataset_name])
         ndims(raw) == 1 && return vec(Float64.(raw))
         ndims(raw) == 2 && return vec(mean(Float64.(raw), dims=2))
-        error("Unsupported dataset shape $(size(raw)) in $(path)")
+        error("Unsupported dataset shape $(size(raw)) in $(local_display_path(path))")
     end
 end
 
@@ -37,7 +39,7 @@ function read_accuracies_lookup(path::AbstractString, dataset_name::String)
             return vec(mean(Float64.(raw), dims=2))
         end
 
-        error("Unsupported accuracies dataset shape $(size(raw)) in $(path)")
+        error("Unsupported accuracies dataset shape $(size(raw)) in $(local_display_path(path))")
     end
 end
 
@@ -59,13 +61,13 @@ function load_feature_landscape(path::AbstractString; epsilon::Float64=0.02, tim
         end
     end
 
-    isempty(dataset_names) && error("No datasets found in $(path)")
+    isempty(dataset_names) && error("No datasets found in $(local_display_path(path))")
 
     accuracies_index = findfirst(n -> occursin("accuracies", lowercase(n)), dataset_names)
     times_index = findfirst(n -> occursin("times", lowercase(n)), dataset_names)
 
-    isnothing(accuracies_index) && error("Could not find an accuracies dataset in $(path). Found: $(dataset_names)")
-    isnothing(times_index) && error("Could not find an times dataset in $(path). Found: $(dataset_names)")
+    isnothing(accuracies_index) && error("Could not find an accuracies dataset in $(local_display_path(path)). Found: $(dataset_names)")
+    isnothing(times_index) && error("Could not find an times dataset in $(local_display_path(path)). Found: $(dataset_names)")
 
     accuracies_dataset_name = dataset_names[accuracies_index]
     times_dataset_name = dataset_names[times_index]

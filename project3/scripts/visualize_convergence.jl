@@ -1,30 +1,32 @@
 using Plots
 
+local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+
 struct ConvergencePoint
     generation::Int
     mean_best_so_far::Float64
 end
 
 function read_convergence_csv(path::AbstractString)
-    isfile(path) || error("Missing convergence CSV: $(path)")
+    isfile(path) || error("Missing convergence CSV: $(local_display_path(path))")
 
     points = ConvergencePoint[]
     open(path, "r") do io
         header = readline(io)
         expected = split(strip(header), ',')
         expected == ["generation", "mean_best_so_far"] ||
-            error("Unexpected CSV header in $(path): $(header)")
+            error("Unexpected CSV header in $(local_display_path(path)): $(header)")
 
         for line in eachline(io)
             stripped = strip(line)
             isempty(stripped) && continue
             cols = split(stripped, ',')
-            length(cols) == 2 || error("Malformed CSV row in $(path): $(line)")
+            length(cols) == 2 || error("Malformed CSV row in $(local_display_path(path)): $(line)")
             push!(points, ConvergencePoint(parse(Int, cols[1]), parse(Float64, cols[2])))
         end
     end
 
-    isempty(points) && error("No convergence rows found in $(path)")
+    isempty(points) && error("No convergence rows found in $(local_display_path(path))")
     points
 end
 

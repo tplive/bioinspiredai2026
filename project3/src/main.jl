@@ -117,6 +117,10 @@ function resolve_path(project_root::String, path::String)
     isabspath(path) ? path : joinpath(project_root, path)
 end
 
+function display_path(project_root::String, path::String)
+    isabspath(path) ? relpath(path, project_root) : path
+end
+
 function get_config_value(config, key::String, default)
     haskey(config, key) ? config[key] : default
 end
@@ -157,7 +161,7 @@ function main()
 
     config_arg = length(ARGS) >= 1 ? ARGS[1] : "configuration.json"
     config_path = resolve_path(project_root, config_arg)
-    isfile(config_path) || error("Missing config file: $(config_path)")
+    isfile(config_path) || error("Missing config file: $(display_path(project_root, config_path))")
     config = JSON.parsefile(config_path)
 
     landscape_mode = Symbol(lowercase(String(get_config_value(config, "landscape_mode", "feature"))))
@@ -224,7 +228,7 @@ function main()
             time_penalty=time_penalty,
         )
         println("Landscape mode: feature")
-        println("Loaded file: $(dataset_path)")
+        println("Loaded file: $(display_path(project_root, dataset_path))")
         println("Accuracy dataset: $(landscape.accuracy_dataset_name)")
         println("Times dataset: $(landscape.times_dataset_name)")
         println("States: $(length(landscape.values)), n=$(landscape.n), one_based=$(landscape.one_based_indexing)")

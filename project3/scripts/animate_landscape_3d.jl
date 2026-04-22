@@ -1,6 +1,8 @@
 using Plots
 using Random
 
+local_display_path(path::AbstractString) = isabspath(path) ? relpath(path, pwd()) : String(path)
+
 struct FitnessPoint
     row::Int
     decimal::Int
@@ -19,20 +21,20 @@ struct OptimumPoint
 end
 
 function read_penalized_fitness_csv(path::AbstractString)
-    isfile(path) || error("Missing penalized fitness CSV: $(path)")
+    isfile(path) || error("Missing penalized fitness CSV: $(local_display_path(path))")
 
     points = FitnessPoint[]
     open(path, "r") do io
         header = readline(io)
         expected = split(strip(header), ',')
         expected == ["row", "decimal", "bitstring", "accuracy", "normalized_time", "active_features", "penalized_fitness"] ||
-            error("Unexpected CSV header in $(path): $(header)")
+            error("Unexpected CSV header in $(local_display_path(path)): $(header)")
 
         for line in eachline(io)
             stripped = strip(line)
             isempty(stripped) && continue
             cols = split(stripped, ',')
-            length(cols) == 7 || error("Malformed CSV row in $(path): $(line)")
+            length(cols) == 7 || error("Malformed CSV row in $(local_display_path(path)): $(line)")
             push!(points, FitnessPoint(
                 parse(Int, cols[1]),
                 parse(Int, cols[2]),
@@ -45,25 +47,25 @@ function read_penalized_fitness_csv(path::AbstractString)
         end
     end
 
-    isempty(points) && error("No penalized fitness rows found in $(path)")
+    isempty(points) && error("No penalized fitness rows found in $(local_display_path(path))")
     points
 end
 
 function read_csv_local_optima(path::AbstractString)
-    isfile(path) || error("Missing local optima CSV: $(path)")
+    isfile(path) || error("Missing local optima CSV: $(local_display_path(path))")
 
     points = OptimumPoint[]
     open(path, "r") do io
         header = readline(io)
         expected = split(strip(header), ',')
         expected == ["row", "decimal", "fitness", "bitstring"] ||
-            error("Unexpected CSV header in $(path): $(header)")
+            error("Unexpected CSV header in $(local_display_path(path)): $(header)")
 
         for line in eachline(io)
             stripped = strip(line)
             isempty(stripped) && continue
             cols = split(stripped, ',')
-            length(cols) == 4 || error("Malformed CSV row in $(path): $(line)")
+            length(cols) == 4 || error("Malformed CSV row in $(local_display_path(path)): $(line)")
             push!(points, OptimumPoint(
                 parse(Int, cols[1]),
                 parse(Int, cols[2]),
