@@ -117,7 +117,7 @@ The batch experiment summary below aggregates the feature-selection runs across 
 		][
 			Best bitstring
 		][
-			Local optima
+			Loc opt
 		],
 
 		[01], [SGA], [10], [0.91473430], [0.91473430], [0.0], [010001000], [7], 
@@ -131,6 +131,14 @@ The batch experiment summary below aggregates the feature-selection runs across 
 		[08], [SGA], [10], [0.77858575], [0.77858575], [0.0], [0000000111111011], [2], 
 		[08], [NSGA-II], [10], [0.95633334], [0.95633334], [0.0], [0000011111111111], [2],
 		[08], [ACO], [10], [0.95633334], [0.95633334], [0.0], [0000011111111111], [2], 
+
+		[06], [SGA], [10], [0.86631443], [0.86433337], [0.0042], [0001010010001000], [136], 
+		[06], [NSGA-II], [10], [0.97916666], [0.97729166], [0.0016], [0101010011001001], [136],
+		[06], [ACO], [10], [0.97916666], [0.97822916], [0.0015], [0101010011001001], [136], 
+
+		[10], [SGA], [10], [0.84823218], [0.84728136], [0.0012], [0000010000000000011], [773], 
+		[10], [NSGA-II], [10], [0.93749999], [0.92890625], [0.0063], [0101101000000000010], [773],
+		[10], [ACO], [10], [0.93229167], [0.92981771], [0.003], [0101011000000000010], [773], 
 	)
 ]<batch-exp-summary>
 
@@ -234,7 +242,7 @@ This appendix maps each required lab goal to the implementation in the codebase,
 		[
 			Test algorithms on unseen landscape and try to find multiple optima.
 		], [
-			Support exists through json-file configuration. The same pipeline can be run on unseen HDF5 landscapes by changing `dataset_path`.
+			Built-in parameterization of batch experiments. Configuration for unseen landscapes in `run_zoo_hep_batch.sh`. The same pipeline can be run on unseen HDF5 landscapes by changing `dataset_path`.
 		], [
 			`configuration.json`
 		],
