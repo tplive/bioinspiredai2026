@@ -171,7 +171,6 @@ function main()
             cfg["dataset_path"] = relpath(dataset_abs, project_root)
             cfg["optimizer"] = opt
             cfg["out_dir"] = out_rel
-            cfg["run_visualization"] = false
             cfg["plot_optima"] = true
             cfg["plot_top_n_optima"] = 0
 

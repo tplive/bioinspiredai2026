@@ -106,11 +106,41 @@ function sample_uniform_fraction(points::Vector{FitnessPoint}, fraction::Float64
     points[sort(indices)]
 end
 
-function write_landscape_3d_png(
+function split_bitstring_coordinates(bitstring::String)
+    half = fld(length(bitstring), 2)
+    left_bits = bitstring[1:half]
+    right_bits = bitstring[half + 1:end]
+
+    x = isempty(left_bits) ? 0 : parse(Int, left_bits; base=2)
+    y = isempty(right_bits) ? 0 : parse(Int, right_bits; base=2)
+    x, y, half, length(bitstring) - half
+end
+
+function build_surface_grid(points::Vector{FitnessPoint})
+    isempty(points) && error("No fitness points available for surface plot")
+
+    reference_bitstring = points[1].bitstring
+    left_size = fld(length(reference_bitstring), 2)
+    right_size = length(reference_bitstring) - left_size
+
+    x_values = collect(0:(2^left_size - 1))
+    y_values = collect(0:(2^right_size - 1))
+    z_values = fill(NaN, length(y_values), length(x_values))
+
+    for point in points
+        x, y, _, _ = split_bitstring_coordinates(point.bitstring)
+        1 <= x + 1 <= length(x_values) || error("Surface x coordinate out of bounds for bitstring $(point.bitstring)")
+        1 <= y + 1 <= length(y_values) || error("Surface y coordinate out of bounds for bitstring $(point.bitstring)")
+        z_values[y + 1, x + 1] = point.penalized_fitness
+    end
+
+    x_values, y_values, z_values, left_size, right_size
+end
+
+function write_landscape_3d_scatter_png(
     path::String,
     points::Vector{FitnessPoint},
-    local_optima::Vector{OptimumPoint},
-    n::Int;
+    local_optima::Vector{OptimumPoint};
     sample_fraction::Float64=0.20,
 )
     sampled_points = sample_uniform_fraction(points, sample_fraction)
@@ -131,8 +161,6 @@ function write_landscape_3d_png(
         push!(opt_z, opt.fitness)
     end
 
-    labeled_opt = sort(local_optima; by=o -> o.fitness, rev=true)[1:min(8, length(local_optima))]
-
     p = scatter3d(
         sampled_x,
         sampled_y,
@@ -140,7 +168,7 @@ function write_landscape_3d_png(
         xlabel="active features",
         ylabel="normalized time",
         zlabel="fitness",
-        title="3D Landscape Around Local Optima",
+        title="3D Landscape Around Local Optima (Scatter)",
         marker=:circle,
         markersize=3,
         markerstrokewidth=0,
@@ -149,7 +177,8 @@ function write_landscape_3d_png(
         c=:viridis,
         colorbar_title="fitness",
         legend=false,
-        size=(1400, 980),
+        size=(2400, 1800),
+        dpi=300,
         camera=(45, 30),
     )
 
@@ -165,12 +194,62 @@ function write_landscape_3d_png(
             markerstrokecolor=:darkred,
             label="local optima",
         )
+    end
 
-        for opt in labeled_opt
-            haskey(lookup, opt.decimal) || continue
-            p0 = lookup[opt.decimal]
-            annotate!(p, p0.active_features, p0.normalized_time, opt.fitness, text("$(opt.bitstring)", 7, :black))
-        end
+    savefig(p, path)
+end
+
+function write_landscape_3d_png(
+    path::String,
+    points::Vector{FitnessPoint},
+    local_optima::Vector{OptimumPoint},
+    n::Int;
+    sample_fraction::Float64=0.20,
+)
+    x_values, y_values, z_values, left_size, right_size = build_surface_grid(points)
+    lookup = point_lookup(points)
+
+    opt_x = Int[]
+    opt_y = Int[]
+    opt_z = Float64[]
+    for opt in local_optima
+        haskey(lookup, opt.decimal) || continue
+        x, y, _, _ = split_bitstring_coordinates(opt.bitstring)
+        push!(opt_x, x)
+        push!(opt_y, y)
+        push!(opt_z, opt.fitness)
+    end
+
+    p = surface(
+        x_values,
+        y_values,
+        z_values;
+        xlabel="first half bits",
+        ylabel="second half bits",
+        zlabel="fitness",
+        title="3D Fitness Landscape Surface",
+        c=:viridis,
+        colorbar_title="fitness",
+        legend=false,
+        linewidth=0,
+        alpha=0.95,
+        size=(2400, 1800),
+        dpi=300,
+        camera=(45, 30),
+    )
+
+    if !isempty(opt_x)
+        scatter3d!(
+            p,
+            opt_x,
+            opt_y,
+            opt_z;
+            marker=:diamond,
+            markersize=7,
+            markercolor=:red,
+            markerstrokecolor=:darkred,
+            label="local optima",
+        )
     end
 
     savefig(p, path)
@@ -277,11 +356,15 @@ function main()
 
     write_landscape_png(output_png, fitness_points, local_optima, n)
     if output_3d_png !== nothing
+        output_3d_scatter_png = replace(output_3d_png, ".png" => "_scatter.png")
+        write_landscape_3d_scatter_png(output_3d_scatter_png, fitness_points, local_optima; sample_fraction=sample_fraction)
         write_landscape_3d_png(output_3d_png, fitness_points, local_optima, n; sample_fraction=sample_fraction)
     end
 
     if output_3d_png !== nothing
         println("3D sample fraction: $(sample_fraction)")
+        println("3D scatter plot: $(output_3d_scatter_png)")
+        println("3D surface plot: $(output_3d_png)")
     end
     println("States represented: $(length(fitness_points)), n=$(n)")
     println("Strict local optima: $(length(local_optima))")

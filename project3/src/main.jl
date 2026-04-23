@@ -89,30 +89,6 @@ function write_penalized_fitness_csv(path::String, landscape::TriangleLandscape)
     end
 end
 
-function run_visualization_script(project_root::String, out_dir::String, local_optima_csv::String)
-    script_path = joinpath(project_root, "scripts", "visualize_landscape.jl")
-    penalized_csv = joinpath(out_dir, "penalized_fitness.csv")
-    output_png = joinpath(out_dir, "fitness_landscape.png")
-    output_3d_png = joinpath(out_dir, "fitness_landscape_3d.png")
-    sample_fraction = 0.20
-
-    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(penalized_csv) $(local_optima_csv) $(output_png) $(output_3d_png) $(sample_fraction)`
-    run(cmd)
-
-    (output_png, output_3d_png)
-end
-
-function run_convergence_visualization_script(project_root::String, out_dir::String)
-    script_path = joinpath(project_root, "scripts", "visualize_convergence.jl")
-    convergence_csv = joinpath(out_dir, "convergence.csv")
-    output_png = joinpath(out_dir, "convergence_curve.png")
-
-    cmd = `$(Base.julia_cmd()) --project=$(project_root) $(script_path) $(convergence_csv) $(output_png)`
-    run(cmd)
-
-    output_png
-end
-
 function resolve_path(project_root::String, path::String)
     isabspath(path) ? path : joinpath(project_root, path)
 end
@@ -170,7 +146,6 @@ function main()
     time_penalty = Float64(get_config_value(config, "time_penalty", 0.01))
     out_dir = resolve_path(project_root, String(get_config_value(config, "out_dir", "artifacts/08_letter_r")))
     strict_local_optima = Bool(get_config_value(config, "strict_local_optima", true))
-    run_visualization = Bool(get_config_value(config, "run_visualization", true))
     plot_optima = Bool(get_config_value(config, "plot_optima", true))
     plot_top_n_optima = Int(get_config_value(config, "plot_top_n_optima", 0))
     optimizer_name = String(get_config_value(config, "optimizer", "sga"))
@@ -273,8 +248,6 @@ function main()
     write_optima_csv(local_optima_plot_path, plot_optima_rows)
 
     convergence_csv_path = joinpath(out_dir, "convergence.csv")
-    convergence_plot_path = joinpath(out_dir, "convergence_curve.png")
-    landscape_3d_path = joinpath(out_dir, "fitness_landscape_3d.png")
 
     write_convergence_csv(convergence_csv_path, mean_curve)
     write_penalized_fitness_csv(joinpath(out_dir, "penalized_fitness.csv"), landscape)
@@ -311,13 +284,8 @@ function main()
     @printf("Mean best fitness (%d runs): %.8f\n", length(seeds), mean_best)
     @printf("Std best fitness (%d runs): %.8f\n", length(seeds), std_best)
 
-    if run_visualization
-        println("Generating landscape plot...")
-        run_visualization_script(project_root, out_dir, local_optima_plot_path)
-
-        println("Generating convergence plot...")
-        run_convergence_visualization_script(project_root, out_dir)
-    end
+    println("Visualization is decoupled from GA runs.")
+    println("Run: julia --project=$(project_root) scripts/visualize_artifact_folder.jl $(display_path(project_root, out_dir))")
 end
 
 main()
