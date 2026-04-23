@@ -4,6 +4,7 @@ using Statistics
 
 local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
+# Define fitness point
 struct FitnessPoint
     row::Int
     decimal::Int
@@ -14,6 +15,7 @@ struct FitnessPoint
     penalized_fitness::Float64
 end
 
+# Define optimum
 struct OptimumPoint
     row::Int
     decimal::Int
@@ -21,6 +23,7 @@ struct OptimumPoint
     bitstring::String
 end
 
+# Get data from experiment
 function read_penalized_fitness_csv(path::String)
     isfile(path) || error("Missing penalized fitness CSV: $(local_display_path(path))")
 
@@ -52,6 +55,7 @@ function read_penalized_fitness_csv(path::String)
     points
 end
 
+# Get local optima
 function read_csv_local_optima(path::String)
     isfile(path) || error("Missing local optima CSV: $(local_display_path(path))")
 
@@ -79,6 +83,7 @@ function read_csv_local_optima(path::String)
     points
 end
 
+# Find length of bitstrings, ensure they match
 function infer_n_from_bitstrings(points::Vector{FitnessPoint}, optima::Vector{OptimumPoint})
     n1 = maximum(length(p.bitstring) for p in points)
     isempty(optima) && return n1
@@ -137,6 +142,7 @@ function build_surface_grid(points::Vector{FitnessPoint})
     x_values, y_values, z_values, left_size, right_size
 end
 
+# 3D scatterplot
 function write_landscape_3d_scatter_png(
     path::String,
     points::Vector{FitnessPoint},
@@ -199,6 +205,7 @@ function write_landscape_3d_scatter_png(
     savefig(p, path)
 end
 
+# PLot 3D landscape
 function write_landscape_3d_png(
     path::String,
     points::Vector{FitnessPoint},

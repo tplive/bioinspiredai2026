@@ -3,6 +3,7 @@ using Random
 
 local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
+# Define data points
 struct FitnessPoint
     row::Int
     decimal::Int
@@ -13,6 +14,7 @@ struct FitnessPoint
     penalized_fitness::Float64
 end
 
+# Define local optima for plotting
 struct OptimumPoint
     row::Int
     decimal::Int
@@ -20,6 +22,8 @@ struct OptimumPoint
     bitstring::String
 end
 
+# Parse generated experiment data
+# Brittle, has to change if dataformat changes!
 function read_penalized_fitness_csv(path::String)
     isfile(path) || error("Missing penalized fitness CSV: $(local_display_path(path))")
 
@@ -51,6 +55,7 @@ function read_penalized_fitness_csv(path::String)
     points
 end
 
+# Get file with local optima
 function read_csv_local_optima(path::String)
     isfile(path) || error("Missing local optima CSV: $(local_display_path(path))")
 
@@ -60,7 +65,7 @@ function read_csv_local_optima(path::String)
         expected = split(strip(header), ',')
         expected == ["row", "decimal", "fitness", "bitstring"] ||
             error("Unexpected CSV header in $(local_display_path(path)): $(header)")
-
+        
         for line in eachline(io)
             stripped = strip(line)
             isempty(stripped) && continue
@@ -75,6 +80,7 @@ function read_csv_local_optima(path::String)
         end
     end
 
+    # Return array of local optima
     points
 end
 
@@ -91,9 +97,11 @@ function sample_uniform_fraction(points::Vector{FitnessPoint}, fraction::Float64
     points[sort(indices)]
 end
 
+# Uses plots.jl to plot data
 function build_landscape_plot(sampled_points::Vector{FitnessPoint}, local_optima::Vector{OptimumPoint}, all_points::Vector{FitnessPoint}; azimuth::Float64=45.0, elevation::Float64=30.0)
     lookup = point_lookup(all_points)
 
+    # Set axis ranges
     sampled_x = [p.active_features for p in sampled_points]
     sampled_y = [p.normalized_time for p in sampled_points]
     sampled_z = [p.penalized_fitness for p in sampled_points]
@@ -110,6 +118,7 @@ function build_landscape_plot(sampled_points::Vector{FitnessPoint}, local_optima
         push!(opt_z, opt.fitness)
     end
 
+    # Create plot
     plt = scatter3d(
         sampled_x,
         sampled_y,
@@ -148,8 +157,10 @@ function build_landscape_plot(sampled_points::Vector{FitnessPoint}, local_optima
 end
 
 function main()
+    # Ensure arguments
     length(ARGS) >= 3 || error("Usage: julia animate_landscape_3d.jl <penalized_fitness.csv> <local_optima.csv> <output.mp4> [sample_fraction] [frames] [fps]")
 
+    # Parse arguments, or use defaults
     penalized_csv = ARGS[1]
     local_optima_csv = ARGS[2]
     output_video = ARGS[3]
@@ -174,6 +185,7 @@ function main()
         build_landscape_plot(sampled_points, local_optima, points; azimuth=azimuth, elevation=30.0)
     end
 
+    # Create MP4 video
     mp4(animation, output_video; fps=fps)
 
     println("States represented (full): $(length(points))")
@@ -182,4 +194,5 @@ function main()
     println("Frames: $(frames), fps: $(fps), sample_fraction: $(sample_fraction)")
 end
 
+#Ensure main function runs on invocation
 main()
