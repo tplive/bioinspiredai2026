@@ -33,7 +33,6 @@
       - How does landscape structure affect optimizer performance?
       - Which algorithm is most robust across datasets?
 
-      - Can we separate data generation from visualization for reproducible analysis?
     ]
     #v(0.2cm)
     #text(size: 12pt)[
@@ -157,6 +156,16 @@
   ],
 )
 
+#slide(
+  [Large asymmetric triangle landscape],
+  [
+    #text(size: 12pt)[
+      - The triangle function has a single global optimum at 31 active bits (fn=6).
+      - There are also local optima at 15 and 25 bits (fn=5).
+      - The NSGA-II algorithm rewards fewer bits, creating search pressure towards the opposite end of the landscape, thus those solutions (with more active bits) are never found.
+    ]
+  ],
+)
 #slide(
   [Conclusions],
   [

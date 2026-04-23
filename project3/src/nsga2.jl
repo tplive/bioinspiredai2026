@@ -1,5 +1,7 @@
 using Random
 
+include("feature_landscape.jl")
+
 function nsga2_objectives(landscape::FeatureLandscape, bits::Vector{Bool})
     decimal = bits_to_decimal(bits)
     row = decimal_to_row(landscape, decimal)
@@ -231,6 +233,8 @@ function run_nsga2(landscape, params::SGAParams; seed::Int)
         best_bits=best_bits,
         best_bitstring=String(join(Int.(best_bits))),
         best_so_far=best_so_far,
+        final_population=population,
+        final_objectives=objectives,
         pareto_size=pareto_size,
     )
 end

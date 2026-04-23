@@ -79,6 +79,9 @@ An additional smaller synthetic run ($n = 8, m = 1, s = 2$) with ACO also reache
 
 These results indicate that both ACO and NSGA-II handle the structured triangle landscape effectively, even when the number of local optima is large.
 
+== New test data with large synthetic landscape
+The new asymmetric triangle function has a single global optimum at 31 active bits. Since the NSGA-II algorithm chosen to optimize this landscape rewards fewer bits, search pressure is towards the opposite end of the landscape.
+
 == Comparative interpretation
 
 Two patterns are clear from the artifact summaries:

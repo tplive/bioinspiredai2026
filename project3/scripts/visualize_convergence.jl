@@ -2,11 +2,13 @@ using Plots
 
 local_display_path(path::String) = isabspath(path) ? relpath(path, pwd()) : String(path)
 
+# Define convergence
 struct ConvergencePoint
     generation::Int
     mean_best_so_far::Float64
 end
 
+# Parse convergence data
 function read_convergence_csv(path::String)
     isfile(path) || error("Missing convergence CSV: $(local_display_path(path))")
 
@@ -27,9 +29,11 @@ function read_convergence_csv(path::String)
     end
 
     isempty(points) && error("No convergence rows found in $(local_display_path(path))")
+    # Return array of convergence points
     points
 end
 
+# Output pnG
 function write_convergence_png(path::String, points::Vector{ConvergencePoint})
     generations = [p.generation for p in points]
     values = [p.mean_best_so_far for p in points]
@@ -58,8 +62,10 @@ function write_convergence_png(path::String, points::Vector{ConvergencePoint})
 end
 
 function main()
+    # Ensure args
     length(ARGS) == 2 || error("Usage: julia visualize_convergence.jl <convergence.csv> <output.png>")
 
+    # Parse args
     csv_path = ARGS[1]
     out_path = ARGS[2]
 
