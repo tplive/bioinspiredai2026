@@ -115,7 +115,10 @@
     )
     #v(0.12cm)
     #text(size: 11pt)[
-      Result: NSGA-II/ACO clearly outperform SGA on both new landscapes.
+      Result:
+      - NSGA-II/ACO clearly outperform SGA on all landscapes.
+      - In the Zoo dataset, both ACO and NSGA-II reach global optimum.
+      - In the hepatitis dataset, only NSGA-II found the global optimum.
     ]
   ],
 )
@@ -148,10 +151,10 @@
         #image("../artifacts/batch/10-hepatitis_lr_F-aco/fitness_landscape_3d.png", width: 70%)
         #text(size: 10pt)[ACO 3D surface]
       ],
-            [
+      [
         #image("../artifacts/batch/10-hepatitis_lr_F-nsga-ii/convergence_curve.png", width: 70%)
         #text(size: 10pt)[NSGA-II convergence]
-      ]
+      ],
     )
   ],
 )
@@ -162,7 +165,7 @@
     #text(size: 12pt)[
       - The triangle function has a single global optimum at 31 active bits (fn=6).
       - There are also local optima at 15 and 25 bits (fn=5).
-      - The NSGA-II algorithm rewards fewer bits, creating search pressure towards the opposite end of the landscape, thus those solutions (with more active bits) are never found.
+      - Since the algorithms rewards fewer bits, search pressure is towards the opposite end of the landscape, thus those solutions (with more active bits) are never found.
     ]
   ],
 )
