@@ -7,6 +7,8 @@
 #outline(title: [Table of Contents])
 #outline(title: [List of Tables], target: figure.where(kind: table))
 
+#outline(title: [List of Figures], target: figure.where(kind: image))
+
 #set heading(numbering: "1.1.a")
 #set par(justify: true)
 
@@ -27,7 +29,7 @@ SGA is a generational binary GA with tournament selection, one-point crossover, 
 
 NSGA-II optimizes accuracy, feature count, and time using Pareto dominance, non-dominated sorting, crowding distance, and parent-offspring elitist selection.
 
-=== Ant colony optimization algorithm (ACO)
+== Ant colony optimization algorithm (ACO)
 
 ACO samples binary solutions from pheromone-heuristic probabilities, mixes guided and random exploration, applies local search to top ants, and updates pheromone with evaporation, bounds, and stagnation reset.
 
